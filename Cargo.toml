@@ -1,0 +1,13 @@
+[package]
+name = "world_scrambler"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+crossterm = "0.22"
+serde = { version = "1.0", features = ["derive"] }
+poll-promise = "0.3"
+ureq = { version = "2.5.0", features = ["json"] }
+rand = "0.8"
+eframe = "0.29.1"
+
