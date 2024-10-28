@@ -27,14 +27,6 @@ impl GameState {
         }
     }
 
-    // Async function to get a new scrambled word from dictionary (API) which updates game state
-    pub fn get_new_scrambled_word(&mut self) {
-        if let Some((original, scrambled)) = api::get_scrambled_word(self.word_length) {
-            self.original_word = original;
-            self.scrambled_word = scrambled;
-        }
-    }
-
     // Function to increment the word length by 1 letter every 4 correct answers
     pub fn increment_word_length(&mut self) {
         if self.level % 4 == 0 {
