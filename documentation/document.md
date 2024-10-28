@@ -161,8 +161,6 @@ This documentation file goes over everything in the Word Unscrambling Github rep
 
 ---
 
----
-
 ## Code Artifacts
 
 ### 1. `main.rs`
