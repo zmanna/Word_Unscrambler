@@ -1,3 +1,44 @@
+/* 
+Code artifacts: 
+- Game Layout and User Interface
+- Timer System, Word Progression Logic
+- Check Word Validity
+- Score/Time Calculation
+- Save States
+
+Description: Word Unscambler Game in which player has 60 seconds to unscramble randomly selected words. Each correct answer rewards 10 points
+and adds a second to the clock while each wrong answer subtracts 5 points from the score and removes a second from the clock. Users must guess
+the same word until the get it right. Every 7 correct words increases the word length by 1 letter.
+
+Programmers:
+- Aryamann Zutshi
+- Willem Battey
+- Spencer Addis
+- John Mosley
+- Paul Dykes
+
+Creation Date: 10/25/2024
+
+Dates revised:
+- 10/27/2024: Build UI (Paul Dykes) and refactor code to fit UI (John Mosley, Spencer Addis, Aryamann Zutshi, Willem Battey)
+
+Preconditions:
+- User-inputted words: unscramble the presented word (String)
+
+Postconditions:
+- Correct/Incorrect: display whether user answered correctly (move to next word) or incorrectly (stay on current word) (String)
+
+Side Effects:
+- Altering the UI with new words
+
+Invariants:
+- Game loop (until timer ends)
+
+Known Faults:
+- Save feature is not integrated into the game yet
+
+*/
+
 mod game_state;
 mod api;
 
