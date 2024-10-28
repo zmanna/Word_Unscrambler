@@ -19,6 +19,7 @@ pub struct WordUnscramblerApp {
     #[serde(skip)]
     scrambled_word_receiver: Option<Receiver<(String, String)>>,
     game_over: bool,
+    correct: String,
 }
 
 impl Default for WordUnscramblerApp {
@@ -30,6 +31,7 @@ impl Default for WordUnscramblerApp {
             validation_receiver: None,
             scrambled_word_receiver: None,
             game_over: false,
+            correct: String::new(),
         }
     }
 }
@@ -48,7 +50,7 @@ impl App for WordUnscramblerApp {
         let elapsed = self.timer_start.elapsed();
         let time_left = Duration::from_secs(60).saturating_sub(elapsed);
 
-        if time_left == Duration::ZERO {
+        if time_left <= Duration::ZERO {
             self.game_over = true;
             return;
         }
@@ -61,8 +63,11 @@ impl App for WordUnscramblerApp {
                     self.game_state.increment_word_length();
                     // Clear the scrambled word to fetch a new one
                     self.game_state.scrambled_word.clear();
+                    self.correct = "Correct!".to_string();
                 } else {
                     self.game_state.incorrect_answer();
+                    self.correct = "Incorrect".to_string();
+                    println!("{}", self.game_state.original_word);
                 }
                 self.validation_receiver = None;
             }
@@ -101,6 +106,7 @@ impl App for WordUnscramblerApp {
             ui.horizontal(|ui| {
                 ui.label("Your guess: ");
                 let response = ui.text_edit_singleline(&mut self.input_text);
+                response.request_focus();
                 if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
                     self.submit_input();
                 }
@@ -109,6 +115,8 @@ impl App for WordUnscramblerApp {
             if ui.button("Submit").clicked() {
                 self.submit_input();
             }
+            
+            ui.heading(format!("{}", self.correct));
         });
 
         // Request repaint
@@ -158,4 +166,3 @@ fn main() {
         Box::new(|_cc| Ok(Box::new(WordUnscramblerApp::default()))),
     );
 }
-

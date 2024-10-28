@@ -32,7 +32,7 @@ impl GameState {
     }
 
     pub fn increment_word_length(&mut self) {
-        if self.level % 7 == 0 {
+        if self.level % 4 == 0 {
             self.word_length += 1;
         }
         self.level += 1;
