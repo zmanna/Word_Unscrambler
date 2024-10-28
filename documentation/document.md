@@ -161,39 +161,253 @@ This documentation file goes over everything in the Word Unscrambling Github rep
 
 ---
 
-### 3. `main.rs`
+---
 
-**Description:** Entry point of the application, orchestrating the game loop, handling user interactions, and integrating all modules.
+## Code Artifacts
 
-**Programmer's Name:** Mann, Spencer, Will
-#### Function: `main()`
+### 1. `main.rs`
 
-- **Brief Description:** Initializes the game, enters the game loop, and handles game over conditions.
+**Description:** Entry point of the application, integrating the game logic, user interface, and handling user interactions using the `eframe` crate for GUI.
+
+**Programmers:**
+- Aryamann Zutshi
+- Willem Battey
+- Spencer Addis
+- John Mosley
+- Paul Dykes
+
+**Creation Date:** 10/25/2024
+
+**Revisions:**
+- **10/27/2024:**
+  - Built the GUI using `eframe` (Paul Dykes).
+  - Refactored code to fit the new GUI (John Mosley, Spencer Addis, Aryamann Zutshi, Willem Battey).
+
+#### Module Imports
+
+- `mod game_state;` — Imports the `game_state` module.
+- `mod api;` — Imports the `api` module.
+- `use eframe::{App, Frame};` — Imports necessary traits for the GUI application.
+- `use eframe::egui::{CentralPanel, Context, Key};` — Imports GUI components.
+- `use std::sync::mpsc::Receiver;` — For inter-thread communication.
+- `use std::time::{Duration, Instant};` — For time tracking.
+- `use serde::{Deserialize, Serialize};` — For serialization.
+
+---
+
+#### Struct: `WordUnscramblerApp`
+
+- **Description:** Represents the state of the application, including the game state, user input, timers, and communication channels.
+- **Fields:**
+  - `game_state: GameState` — The current game state.
+  - `input_text: String` — The current text input from the user.
+  - `timer_start: Instant` — The start time of the game timer.
+  - `validation_receiver: Option<Receiver<(String, bool)>>` — Receiver for input validation results.
+  - `scrambled_word_receiver: Option<Receiver<(String, String)>>` — Receiver for scrambled words from the API.
+  - `game_over: bool` — Indicates if the game is over.
+  - `correct: String` — Message indicating if the last answer was correct or incorrect.
+
+**Preconditions:**
+- The application requires an active internet connection to fetch words from the API.
+
+**Postconditions:**
+- Maintains the game state throughout the application lifecycle.
+- Updates the GUI based on user interactions and game progression.
+
+**Side Effects:**
+- Alters the GUI to display new words and game information.
+
+**Invariants:**
+- The game runs until the timer ends or the user exits.
+
+**Known Faults:**
+- The save feature is not yet integrated into the game.
+
+---
+
+#### Implementation: `Default` for `WordUnscramblerApp`
+
+- **Brief Description:** Initializes `WordUnscramblerApp` with default values.
 - **Preconditions:**
   - None.
 - **Postconditions:**
-  - Runs the game until time runs out or the player quits.
+  - Sets up a new game with initial settings.
 - **Side Effects:**
-  - Reads user input and writes to the console.
+  - None.
+- **Invariants:**
+  - `game_over` is `false` upon initialization.
+- **Known Faults:**
+  - None.
+
+---
+
+#### Trait Implementation: `App` for `WordUnscramblerApp`
+
+- **Function:** `update(&mut self, ctx: &Context, _frame: &mut Frame)`
+- **Brief Description:** Updates the application state and GUI every frame.
+- **Preconditions:**
+  - `self` must be a valid `WordUnscramblerApp` instance.
+- **Postconditions:**
+  - Renders the GUI, handles user input, updates timers, and processes game logic.
+- **Error and Exception Conditions:**
+  - None handled explicitly.
+- **Side Effects:**
+  - Modifies `self` and updates the GUI.
+- **Invariants:**
+  - The game loop continues until `game_over` is `true`.
+- **Known Faults:**
+  - None.
+
+**Detailed Behavior:**
+
+- **Game Over Check:**
+  - If `game_over` is `true`, displays "Game Over!" and the final score, then returns.
+- **Time Update:**
+  - Updates `time_left` by subtracting the elapsed time from the total duration.
+  - If `time_left` is zero or negative, sets `game_over` to `true`.
+- **Validation Receiver Handling:**
+  - Checks if a validation result is received.
+  - If the answer is correct, updates the game state accordingly.
+  - If incorrect, penalizes the player and displays the correct word.
+- **Scrambled Word Receiver Handling:**
+  - Receives new scrambled words from the API.
+  - If no scrambled word is available, requests one from the API.
+- **GUI Rendering:**
+  - Displays the time left, score, scrambled word, and input field.
+  - Handles user input submission.
+  - Displays messages indicating whether the last answer was correct or incorrect.
+- **Repaint Request:**
+  - Requests the GUI to repaint after a short duration.
+
+---
+
+#### Method: `submit_input(&mut self)`
+
+- **Brief Description:** Processes the user's input when they submit a guess.
+- **Preconditions:**
+  - None.
+- **Postconditions:**
+  - Validates the user's input and updates the game state.
+- **Error and Exception Conditions:**
+  - None handled explicitly.
+- **Side Effects:**
+  - Clears the input field.
+  - Spawns a thread to validate the input.
 - **Invariants:**
   - None.
 - **Known Faults:**
   - None.
+
+**Detailed Behavior:**
+
+1. Trims the user's input and checks if it's empty.
+2. Clears the `input_text`.
+3. Clones the `original_word` from the game state.
+4. Creates a channel (`sender`, `receiver`) for validation results.
+5. Spawns a background thread to validate the input:
+   - Checks if the input is an exact match with the `original_word`.
+   - If not, checks if the input is a valid word and an anagram of the `original_word`.
+   - Sends the result back through the channel.
+6. Sets `validation_receiver` to the created `receiver`.
+
+---
 
 #### Function: `can_form_anagram(input: &str, original: &str) -> bool`
 
-- **Brief Description:** Checks if the input word is an anagram of the original word.
+- **Brief Description:** Determines if the `input` is an anagram of `original`.
 - **Preconditions:**
   - `input` and `original` are non-empty strings.
 - **Postconditions:**
-  - Returns `true` if `input` is an anagram of `original`.
+  - Returns `true` if `input` can be formed by rearranging the letters of `original`.
   - Returns `false` otherwise.
+- **Error and Exception Conditions:**
+  - None.
 - **Side Effects:**
   - None.
 - **Invariants:**
-  - The sorted characters of both words are compared.
+  - The comparison is case-sensitive.
+- **Known Faults:**
+  - Does not handle case insensitivity or special characters.
+
+**Implementation Details:**
+
+- Converts both `input` and `original` into character vectors.
+- Sorts both vectors.
+- Compares the sorted vectors for equality.
+
+---
+
+#### Function: `main()`
+
+- **Brief Description:** Sets up and runs the application using `eframe`.
+- **Preconditions:**
+  - None.
+- **Postconditions:**
+  - Launches the GUI application.
+- **Error and Exception Conditions:**
+  - None handled explicitly.
+- **Side Effects:**
+  - Initializes the GUI window.
+- **Invariants:**
+  - None.
 - **Known Faults:**
   - None.
+
+**Implementation Details:**
+
+- Creates default native options for `eframe`.
+- Runs the `WordUnscramblerApp` using `eframe::run_native`.
+
+---
+
+### 2. `api.rs`
+
+*(No changes from the previous documentation, but included here for completeness.)*
+
+**Description:** Handles API calls to fetch random words and validate if a given word exists in the dictionary.
+
+**Programmers:**
+- [Your Name]
+
+**Date Created:** [Creation Date]
+
+**Revisions:**
+- [Revision Date]: [Description of revision] by [Author's Name]
+
+#### Function: `get_scrambled_word(length: usize) -> Option<(String, String)>`
+
+- **Brief Description:** Fetches a random word of specified length, scrambles it, and returns both the original and scrambled word.
+- **Preconditions:**
+  - `length` must be a positive integer.
+- **Postconditions:**
+  - Returns `Some((original_word, scrambled_word))` if successful.
+  - Returns `None` if the API call fails.
+- **Error and Exception Conditions:**
+  - Network errors during the API call.
+  - JSON parsing errors.
+- **Side Effects:**
+  - None.
+- **Invariants:**
+  - The scrambled word is a permutation of the original word.
+- **Known Faults:**
+  - The API may return words with unexpected characters.
+
+#### Function: `is_valid_word(word: &str) -> bool`
+
+- **Brief Description:** Checks if a given word is valid according to the dictionary API.
+- **Preconditions:**
+  - `word` must be a non-empty string.
+- **Postconditions:**
+  - Returns `true` if the word exists in the dictionary.
+  - Returns `false` otherwise.
+- **Error and Exception Conditions:**
+  - Network errors during the API call.
+- **Side Effects:**
+  - None.
+- **Invariants:**
+  - None.
+- **Known Faults:**
+  - The API may have rate limits affecting multiple rapid calls.
 
 ---
 
@@ -238,27 +452,6 @@ This documentation file goes over everything in the Word Unscrambling Github rep
   - None.
 
 ---
-
-### 5. `ui.rs`
-
-**Description:** Manages user interface elements, including displaying game information and capturing user input.
-
-**Programmer's Name:** Paul
-#### Function: `display_scrambled(game_state: &GameState)`
-
-- **Brief Description:** Clears the console and displays the current game state, including time left, score, and the scrambled word.
-- **Preconditions:**
-  - `game_state` is a valid `GameState` instance.
-- **Postconditions:**
-  - Updates the console display with current game information.
-- **Error and Exception Conditions:**
-  - Terminal commands may fail on unsupported consoles.
-- **Side Effects:**
-  - Clears and writes to the console.
-- **Invariants:**
-  - None.
-- **Known Faults:**
-  - May not work properly on non-standard terminals.
 
 #### Function: `get_user_input() -> String`
 
