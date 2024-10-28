@@ -169,7 +169,7 @@ impl App for WordUnscramblerApp {
                 ui.label("Your guess: "); // Display label
                 let response = ui.text_edit_singleline(&mut self.input_text); // Display text input
                 response.request_focus(); // Request focus for text input
-                if response.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) { // If focus is lost and Enter key is pressed
+                if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
                     self.submit_input(); // Submit the input
                 }
             });
