@@ -6,7 +6,7 @@ use crate::api;                      // Use dictionary API
 #[derive(Serialize, Deserialize)]
 pub struct GameState {
     pub score: u32,               // Player score
-    pub time_left: Duration,      // Time left
+    pub time_alotted: Duration,      // Time left
     pub word_length: usize,       // Length of word to unscamble
     pub correct_answers: u8,      // Correct answer (determines word length)
     pub original_word: String,    // Original word (determines correct answer)
@@ -18,7 +18,7 @@ impl GameState {
     pub fn new() -> Self {
         Self {
             score: 0,                              // Score starts at 0
-            time_left: Duration::from_secs(60),    // Start with 60 sec on clock
+            time_alotted: Duration::from_secs(60),    // Start with 60 sec on clock
             word_length: 4,                        // Start by unscrambling 4 letter words
             correct_answers: 0,                    // Start at correct_answers 1 (+1 correct_answers every 4 words)
             original_word: String::new(),          // Initiate new word
@@ -28,42 +28,37 @@ impl GameState {
     }
 
     // Async function to get a new scrambled word from dictionary (API) which updates game state
-    pub fn get_new_scrambled_word(&mut self) {
-        if let Some((original, scrambled)) = api::get_scrambled_word(self.word_length) {
+    pub fn get_new_scrambled_word(&mut self) -> &mut Self {
+        if let Some((scrambled, original)) = api::get_scrambled_word(self.word_length) {
             self.original_word = original;
             self.scrambled_word = scrambled;
-        }
+       }
+        self
     }
 
     // Function to increment the word length by 1 letter every 4 correct answers
-    pub fn increment_word_length(&mut self) {
+    pub fn increment_word_length(&mut self) -> &mut Self {
         if self.level % 4 == 0 {
             self.word_length += 1;
         }
         self.level += 1;
+        self
     }
 
     // Function to handle when player inputs correct answer
-    pub fn correct_answer(&mut self) {
+    pub fn correct_answer(&mut self) -> &mut Self {
         self.score += 10;
-        self.adjust_time(1); // Add 1 second for correct answer
+        self.time_alotted += Duration::from_secs(5);
+        self
     }
 
     // Function to handle when player inputs incorrect answer
-    pub fn incorrect_answer(&mut self) {
+    pub fn incorrect_answer(&mut self) -> &mut Self {
         if self.score >= 5 {
             self.score -= 5;
         }
-        self.adjust_time(-1); // Subtract 1 second for incorrect answer
-    }
-
-    // Function to adjust time based on correct/incorrect answer
-    fn adjust_time(&mut self, seconds: i64) {
-        if seconds > 0 {                                                // If change in time is positive (correct answer)
-            self.time_left += Duration::from_secs(seconds as u64);      // Add time when correct answer
-        } else {                                                        // If change in time is negative (incorrect answer/time elapsing)
-            self.time_left = self.time_left.checked_sub(Duration::from_secs((-seconds) as u64))  // Subtract time
-            .unwrap_or(Duration::ZERO);                                 // If subtracting time makes duration negative, then time is 0!
-        }
+        
+        self.time_alotted = self.time_alotted.checked_sub(Duration::from_secs(5)).unwrap_or(Duration::ZERO);
+        self
     }
 }

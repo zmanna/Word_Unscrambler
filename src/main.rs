@@ -17,7 +17,7 @@ Programmers:
 - John Mosley
 - Paul Dykes
 
-Creation Date: 10/25/2024
+Creation Date: 10/25/2024F
 
 Dates revised:
 - 10/27/2024: Build UI (Paul Dykes) and refactor code to fit UI (John Mosley, Spencer Addis, Aryamann Zutshi, Willem Battey)
@@ -27,7 +27,7 @@ Preconditions:
 
 Postconditions:
 - Correct/Incorrect: display whether user answered correctly (move to next word) or incorrectly (stay on current word) (String)
-
+00
 Side Effects:
 - Altering the UI with new words
 
@@ -41,9 +41,15 @@ Known Faults:
 
 mod game_state;
 mod api;
+mod shape_builder;
+mod ui_elements;
 
+use eframe::epaint::{Fonts, RectShape};
+use eframe::glow::ZERO;
 use eframe::{App, Frame};
-use eframe::egui::{CentralPanel, Context, Key};
+use eframe::egui::{CentralPanel, Color32, Context, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
+use shape_builder::{ShapeAttributes, RoundingType, Dimensions};
+use ui_elements::{letter_square, letter_content};
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
@@ -53,6 +59,7 @@ use serde::{Deserialize, Serialize};
 pub struct WordUnscramblerApp {
     game_state: game_state::GameState,
     input_text: String,
+    guess_history: Vec<String>,
     #[serde(skip)]
     timer_start: Instant,
     #[serde(skip)]
@@ -66,19 +73,10 @@ pub struct WordUnscramblerApp {
 impl Default for WordUnscramblerApp {
     fn default() -> Self {
         Self {
-            /* 
-            This implementation of the Default trait for the WordUnscramblerApp struct
-            initializes the struct with the following default values:
-            - game_state: A new instance of GameState from the game_state module.
-            - input_text: An empty String.
-            - timer_start: The current time using Instant::now().
-            - validation_receiver: None, indicating no receiver is set.
-            - scrambled_word_receiver: None, indicating no receiver is set.
-            - game_over: false, indicating the game is not over.
-            - correct: An empty String.
-            */
+            //Instantiate default game values
             game_state: game_state::GameState::new(),
             input_text: String::new(),
+            guess_history: Vec::new(),
             timer_start: Instant::now(),
             validation_receiver: None,
             scrambled_word_receiver: None,
@@ -100,36 +98,36 @@ impl App for WordUnscramblerApp {
     The function returns immediately after displaying the game over message.
      */
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        if self.game_over {
-            CentralPanel::default().show(ctx, |ui| {
-                ui.heading("Game Over!");
-                ui.label(format!("Final Score: {}", self.game_state.score));
-            });
-            return;
-        }
-
+        //Unpack game_state values
+        let mut scrambled_word = self.game_state.scrambled_word.clone();
+        let mut original_word = self.game_state.scrambled_word.clone();
+        
+        
         // Update time left
-        let elapsed = self.timer_start.elapsed();
-        let time_left = Duration::from_secs(60).saturating_sub(elapsed);
-
-        if time_left <= Duration::ZERO {
-            self.game_over = true;
-            return;
+        let time_remaining = if let Some(res) = self.game_state.time_alotted.checked_sub(self.timer_start.elapsed()) {
+            res
         }
+        else{
+            self.game_over = true;
+            Duration::ZERO //Prevent overflow by setting duration to zero if time elapsed is greater than time alotted
+        };
+
 
         // Handle validation receiver
         if let Some(receiver) = &self.validation_receiver {
             if let Ok((input, is_valid)) = receiver.try_recv() {
-                if is_valid { // If the input is valid
-                    self.game_state.correct_answer(); // Handle correct answer
-                    self.game_state.increment_word_length(); // Increment word length
-                    // Clear the scrambled word to fetch a new one
-                    self.game_state.scrambled_word.clear(); // Clear the scrambled word
-                    self.correct = "Correct!".to_string(); // Set correct message
+                if is_valid {
+                    self.guess_history.push(format!("Correct: {}", input));
+                    self.game_state
+                        .correct_answer() 
+                        .increment_word_length()
+                        .get_new_scrambled_word();
+                    self.correct = "Correct!".into(); // Set correct message
                 } else {
+                    self.guess_history.push(format!("=> {}", input));
                     self.game_state.incorrect_answer(); // Handle incorrect answer
                     self.correct = "Incorrect".to_string(); // Set incorrect message
-                    println!("{}", self.game_state.original_word); // Print the original word
+                    println!("{}", original_word); // Print the original word
                 }
                 self.validation_receiver = None; // Clear the validation receiver
             }
@@ -137,12 +135,12 @@ impl App for WordUnscramblerApp {
 
         // Handle scrambled word receiver
         if let Some(receiver) = &self.scrambled_word_receiver {
-            if let Ok((scrambled_word, original_word)) = receiver.try_recv() { // If scrambled word is received
-                self.game_state.scrambled_word = scrambled_word; // Set the scrambled word
-                self.game_state.original_word = original_word; // Set the original word
+            if let Ok((scrambled, original)) = receiver.try_recv() { // If scrambled word is received
+                scrambled_word = scrambled; // Set the scrambled word
+                original_word = original; // Set the original word
                 self.scrambled_word_receiver = None; // Clear the scrambled word receiver
             }
-        } else if self.game_state.scrambled_word.is_empty() { // If scrambled word is empty
+        } else if scrambled_word.is_empty() { // If scrambled word is empty
             let word_length = self.game_state.word_length; // Get the word length
             let (sender, receiver) = std::sync::mpsc::channel(); // Create a new channel
             self.scrambled_word_receiver = Some(receiver); // Set the scrambled word receiver
@@ -157,28 +155,32 @@ impl App for WordUnscramblerApp {
         }
 
         // Build the UI
-        CentralPanel::default().show(ctx, |ui| {
-            ui.heading(format!("Time left: {} seconds", time_left.as_secs())); // Display time left
-            ui.heading(format!("Score: {}", self.game_state.score)); // Display score
+        TopBottomPanel::top("timer_bar").show(ctx, |ui|{ //Timer
+            ui.heading(format!("Time left: {} seconds", time_remaining.as_secs()))
+        });
+        
+        SidePanel::right("score_and_history").show(ctx, |ui|{ //Score and Guess History
+            ui.heading(format!("Score: {}", self.game_state.score));
+            ui.separator();
+            ui.label(format!("Guess History: {}", self.guess_history.join("\n")))
+        });
 
-            ui.separator(); // Add a separator
+        CentralPanel::default().show(ctx, |ui| { //Game Area
+            //Instantiate UI elements
+            let mut i = 0.0;
+            let mut containers =  Vec::new();
+            let font_library = Fonts::new(1.0, 10, FontDefinitions::default());
+            let scrambled_display: Vec<Shape> = scrambled_word.chars().map(|letter|{ 
+                i += 1.0; 
+                let position = (100.0 + (i * 55.0), 100.0);
+                containers.push(Shape::Rect(letter_square(50.0, position)));
+                Shape::Text(letter_content(position, letter.to_string(), font_library.clone()))
+            }).collect();
 
-            ui.heading(format!("Scrambled Word: {}", self.game_state.scrambled_word)); // Display scrambled word
-
-            ui.horizontal(|ui| { // Create a horizontal layout
-                ui.label("Your guess: "); // Display label
-                let response = ui.text_edit_singleline(&mut self.input_text); // Display text input
-                response.request_focus(); // Request focus for text input
-                if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
-                    self.submit_input(); // Submit the input
-                }
-            });
-
-            if ui.button("Submit").clicked() { // If the submit button is clicked
-                self.submit_input(); // Submit the input
-            }
-            
-            ui.heading(format!("{}", self.correct)); // Display correct/incorrect message
+            //Display UI on screen
+            ui.painter().extend(containers);
+            ui.painter().extend(scrambled_display);
+            ui.painter().add(ui_elements::scrambled_tray(50.0, 1, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))))
         });
 
         // Request repaint
@@ -186,7 +188,7 @@ impl App for WordUnscramblerApp {
     }
 }
 
-impl WordUnscramblerApp {
+Impl WordUnscramblerApp {
    fn submit_input(&mut self) {
         /*  
         The submit_input/1 function processes the user's input in the WordUnscramblerApp.
@@ -242,3 +244,33 @@ fn main() {
         Box::new(|_cc| Ok(Box::new(WordUnscramblerApp::default()))), // Create a new WordUnscramblerApp instance
     );
 }
+
+
+
+/*
+            if self.game_over{
+                ui.heading("Game Over!");
+                ui.label(format!("Final Score: {}", self.game_state.score));
+                ctx.request_repaint();
+                return;
+            }
+            else{
+                ui.heading(format!("Scrambled Word: {}", scrambled_word)); // Display scrambled word
+
+                ui.horizontal(|ui| { // Create a horizontal layout
+                    ui.label("Your guess: "); // Display label
+                    let response = ui.text_edit_singleline(&mut self.input_text); // Display text input
+                    response.request_focus(); // Request focus for text input
+                    if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
+                        self.submit_input(); // Submit the input
+                    }
+                });
+
+                if ui.button("Submit").clicked() { // If the submit button is clicked
+                    self.submit_input(); // Submit the input
+                }
+                
+                ui.heading(format!("{}", self.correct)); // Display correct/incorrect message
+                
+            }
+*/
