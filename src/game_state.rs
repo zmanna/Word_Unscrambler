@@ -23,9 +23,13 @@ impl GameState {
             correct_answers: 0,                    // Start at correct_answers 1 (+1 correct_answers every 4 words)
             original_word: String::new(),          // Initiate new word
             scrambled_word: String::new(),         // Scramble word
-            level: 1,                              // Start at level 1 (+1 level every 4 right answers)
-        }
+            level: 1}                              // Start at level 1 (+1 level every 4 right answers)
     }
+
+trait WordValidation{
+    pub fn validation(self, validation_receiver: Option<Receiver<String, bool>>);
+    pub fn word_generator(self, validation_receiver: Option<Receiver<String, String>>);
+}
 
     // Async function to get a new scrambled word from dictionary (API) which updates game state
     pub fn get_new_scrambled_word(&mut self) -> &mut Self {
@@ -62,3 +66,56 @@ impl GameState {
         self
     }
 }
+
+impl WordValidation for GameState{
+    fn validation(self, validation_receiver: Option<Receiver<String, bool>>) -> bool{
+
+        if let Some(receiver) = &self.validation_receiver {
+            if let Ok((input, is_valid)) = receiver.try_recv() {
+                if is_valid {
+                    self.correct_answer() 
+                        .increment_word_length()
+                        .get_new_scrambled_word();
+                    return true;
+                } else {
+                    self.ncorrect_answer(); // Handle incorrect answer
+                    println!("{}", original_word); // Print the original word
+                    return false;
+                }
+                validation_receiver = None; // Clear the validation receiver
+            }
+        }
+    }
+
+
+    fn word_generator(self, word_receiver: Option<Receiver<String, String>>){
+
+        match word_receiver{
+            Ok(scrambled_and_original) =>
+                match scrambled_and_original{
+                    Ok((scrambled, original)) =>{
+                        self.scrambled_word = scrambled;
+                        self.original_word = original;
+                    },
+                    Err(e) => eprint!("Error unpacking receiver: {}", e),
+                },
+            Err(e) =>eprint!("Error retrieving receiver {}", e),
+        }   
+    }
+}
+
+
+
+
+if scrambled_word.is_empty() { // If scrambled word is empty
+        let word_length = self.word_length; // Get the word length
+        let (sender, receiver) = std::sync::mpsc::channel(); // Create a new channel
+        self.scrambled_word_receiver = Some(receiver); // Set the scrambled word receiver
+
+        std::thread::spawn(move || {
+            let result = match api::get_scrambled_word(word_length) { // Get a scrambled word
+                Some((scrambled_word, original_word)) => (scrambled_word, original_word), // If scrambled word is found
+                None => ("default_scrambled".to_string(), "default_original".to_string()), // If scrambled word is not found
+            };
+            let _ = sender.send(result); // Send the scrambled word
+        });

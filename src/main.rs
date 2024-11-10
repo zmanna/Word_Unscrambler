@@ -44,12 +44,13 @@ mod api;
 mod shape_builder;
 mod ui_elements;
 
-use eframe::epaint::{Fonts, RectShape};
-use eframe::glow::ZERO;
+use eframe::egui::{FontFamily, FontId, FontSelection};
 use eframe::{App, Frame};
-use eframe::egui::{CentralPanel, Color32, Context, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
+use eframe::egui::{CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
+use emath::Align2;
 use shape_builder::{ShapeAttributes, RoundingType, Dimensions};
-use ui_elements::{letter_square, letter_content};
+use ui_elements::letter_square;
+use std::env;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
@@ -112,48 +113,6 @@ impl App for WordUnscramblerApp {
             Duration::ZERO //Prevent overflow by setting duration to zero if time elapsed is greater than time alotted
         };
 
-
-        // Handle validation receiver
-        if let Some(receiver) = &self.validation_receiver {
-            if let Ok((input, is_valid)) = receiver.try_recv() {
-                if is_valid {
-                    self.guess_history.push(format!("Correct: {}", input));
-                    self.game_state
-                        .correct_answer() 
-                        .increment_word_length()
-                        .get_new_scrambled_word();
-                    self.correct = "Correct!".into(); // Set correct message
-                } else {
-                    self.guess_history.push(format!("=> {}", input));
-                    self.game_state.incorrect_answer(); // Handle incorrect answer
-                    self.correct = "Incorrect".to_string(); // Set incorrect message
-                    println!("{}", original_word); // Print the original word
-                }
-                self.validation_receiver = None; // Clear the validation receiver
-            }
-        }
-
-        // Handle scrambled word receiver
-        if let Some(receiver) = &self.scrambled_word_receiver {
-            if let Ok((scrambled, original)) = receiver.try_recv() { // If scrambled word is received
-                scrambled_word = scrambled; // Set the scrambled word
-                original_word = original; // Set the original word
-                self.scrambled_word_receiver = None; // Clear the scrambled word receiver
-            }
-        } else if scrambled_word.is_empty() { // If scrambled word is empty
-            let word_length = self.game_state.word_length; // Get the word length
-            let (sender, receiver) = std::sync::mpsc::channel(); // Create a new channel
-            self.scrambled_word_receiver = Some(receiver); // Set the scrambled word receiver
-
-            std::thread::spawn(move || {
-                let result = match api::get_scrambled_word(word_length) { // Get a scrambled word
-                    Some((scrambled_word, original_word)) => (scrambled_word, original_word), // If scrambled word is found
-                    None => ("default_scrambled".to_string(), "default_original".to_string()), // If scrambled word is not found
-                };
-                let _ = sender.send(result); // Send the scrambled word
-            });
-        }
-
         // Build the UI
         TopBottomPanel::top("timer_bar").show(ctx, |ui|{ //Timer
             ui.heading(format!("Time left: {} seconds", time_remaining.as_secs()))
@@ -168,27 +127,34 @@ impl App for WordUnscramblerApp {
         CentralPanel::default().show(ctx, |ui| { //Game Area
             //Instantiate UI elements
             let mut i = 0.0;
-            let mut containers =  Vec::new();
-            let font_library = Fonts::new(1.0, 10, FontDefinitions::default());
-            let scrambled_display: Vec<Shape> = scrambled_word.chars().map(|letter|{ 
+            for letter in scrambled_word.chars(){ 
                 i += 1.0; 
                 let position = (100.0 + (i * 55.0), 100.0);
-                containers.push(Shape::Rect(letter_square(50.0, position)));
-                Shape::Text(letter_content(position, letter.to_string(), font_library.clone()))
-            }).collect();
 
-            //Display UI on screen
-            ui.painter().extend(containers);
-            ui.painter().extend(scrambled_display);
+                //Paint letters from the scrambled word
+                ui.painter().text(
+                    Pos2::from(position), 
+                    Align2::CENTER_BOTTOM, 
+                    letter,
+                    FontId::new(
+                        40.,
+                        FontFamily::Monospace),
+                    Color32::WHITE);
+                
+                //Paint the letter containers
+                ui.painter().add(Shape::Rect(letter_square(50.0, position)));
+            };
+
+            //Display UI
             ui.painter().add(ui_elements::scrambled_tray(50.0, 1, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))))
         });
 
         // Request repaint
-        ctx.request_repaint_after(Duration::from_millis(100));
+        //ctx.request_repaint_after(Duration::from_millis(100));
     }
 }
 
-Impl WordUnscramblerApp {
+impl WordUnscramblerApp {
    fn submit_input(&mut self) {
         /*  
         The submit_input/1 function processes the user's input in the WordUnscramblerApp.
@@ -237,6 +203,7 @@ fn can_form_anagram(input: &str, original: &str) -> bool {
 }
 
 fn main() {
+    //env::set_var("RUST_BACKTRACE", "1");
     let native_options = eframe::NativeOptions::default(); // Create default native options
     let _ = eframe::run_native( // Run the native app
         "Word Unscrambler", // Set the app title

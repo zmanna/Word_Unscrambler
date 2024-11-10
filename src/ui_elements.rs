@@ -24,6 +24,8 @@ pub fn scrambled_tray(letter_width: f32, letters: u8, pos: Pos2) -> RectShape{
     RectShape::from(attr)
 }
 
+
+/*
 pub fn letter_content(owner_position: (f32, f32), contents: String, font_library: Fonts) -> TextShape{
     let attr = TextAttributes{
         position: Pos2::from((owner_position.0 + 10.0, owner_position.1 + 10.0)),
@@ -37,3 +39,4 @@ pub fn letter_content(owner_position: (f32, f32), contents: String, font_library
     };
     TextShape::from(attr)
 }
+*/
