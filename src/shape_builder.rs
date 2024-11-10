@@ -49,7 +49,7 @@ impl From<Dimensions> for Rect{
             Dimensions::HeightWidth(height, width, coords) => 
                 Self { 
                     min: coords,
-                    max: coords.max(Pos2::from(coords + Vec2::from((height, width))))},
+                    max: coords.max(Pos2::from(coords + Vec2::from((width, height))))},
 
             Dimensions::Uniform(size, coords) => 
                 Self { 

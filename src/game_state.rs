@@ -37,8 +37,8 @@ pub trait UpdateGameVariables{
     fn increment_word_length(&mut self) -> &mut Self;
     fn correct_answer(&mut self) -> &mut Self;
     fn incorrect_answer(&mut self) -> &mut Self;
-    fn set_word(&mut self, scrambled: String, original: String) -> &mut Self;
-    fn get_new_word(&mut self) -> &mut Self;
+    fn set_word(&mut self, scrambled: String, original: String);
+    fn get_new_word(&mut self);
 }
 
 impl UpdateGameVariables for GameState{
@@ -64,17 +64,16 @@ impl UpdateGameVariables for GameState{
             self.score -= 5;
         }
         
-        self.time_alotted = self.time_alotted.checked_sub(Duration::from_secs(5)).unwrap_or(Duration::ZERO);
+        self.time_alotted.checked_sub(Duration::from_secs(5)).unwrap_or(Duration::ZERO);
         self
     }
     
-    fn set_word(&mut self, scrambled: String, original: String) -> &mut Self {
+    fn set_word(&mut self, scrambled: String, original: String){
         self.scrambled_word = scrambled;
         self.original_word = original;
-        self
     }
 
-    fn get_new_word (&mut self) -> &mut Self{
+    fn get_new_word (&mut self){
         let (sender, receiver) = std::sync::mpsc::channel(); //Send to, and receive from the API
         let word_length = self.word_length;
 
@@ -86,11 +85,9 @@ impl UpdateGameVariables for GameState{
         });
 
         match receiver.recv(){
-            Ok((scrambled, original)) =>{self.set_word(scrambled, original);
-                                         self},
-
-            Err(e) => {eprint!("Error unpacking receiver: {}", e);
-                       self}}
+            Ok((scrambled, original)) => self.set_word(scrambled, original),
+            Err(e) => self.set_word("ERROR".into(), "ERROR".into()),
+        }
     }
 }
 
@@ -116,7 +113,8 @@ impl ValidateAnswer for GameState{
                        println!("{}", &self.original_word);}
             }
 
-            Err(e) => eprint!("Error validating guess: {}", e)}
+            Err(e) => eprint!("Error validating guess: {}", e)};
+        
     }
 
     fn can_form_anagram(input: String, original: String) -> bool {

@@ -44,25 +44,27 @@ mod api;
 mod shape_builder;
 mod ui_elements;
 
-use eframe::egui::{FontFamily, FontId, FontSelection};
+use eframe::egui::{Event, FontFamily, FontId, FontSelection};
 use eframe::{App, Frame};
-use eframe::egui::{CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
+use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
 use emath::Align2;
 use shape_builder::{ShapeAttributes, RoundingType, Dimensions};
-use ui_elements::letter_square;
+use ui_elements::{letter_square, GenerateAnchors, GenerateUiShapes, UiElements};
+use std::any::Any;
+use std::borrow::Borrow;
 use std::env;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use crate::game_state::{ValidateAnswer, UpdateGameVariables};
-
+use regex::Regex;
 
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct WordUnscramblerApp {
     game_state: game_state::GameState,
-    input_text: String,
     guess_history: Vec<String>,
+    input_text: String,
     #[serde(skip)]
     timer_start: Instant,
     #[serde(skip)]
@@ -71,6 +73,10 @@ pub struct WordUnscramblerApp {
     scrambled_word_receiver: Option<Receiver<(String, String)>>,
     game_over: bool,
     correct: String,
+    #[serde(skip)]
+    ui_elements: UiElements,
+    #[serde(skip)]
+    game_space: Rect,
 }
 
 impl Default for WordUnscramblerApp {
@@ -78,13 +84,15 @@ impl Default for WordUnscramblerApp {
         Self {
             //Instantiate default game values
             game_state: game_state::GameState::new(),
-            input_text: String::new(),
             guess_history: Vec::new(),
+            input_text: String::new(),
             timer_start: Instant::now(),
             validation_receiver: None,
             scrambled_word_receiver: None,
             game_over: false,
             correct: String::new(),
+            ui_elements: UiElements::default(),
+            game_space: Rect::EVERYTHING,
         }
     }
 }
@@ -101,8 +109,10 @@ impl App for WordUnscramblerApp {
     The function returns immediately after displaying the game over message.
      */
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        if self.game_state.scrambled_word.is_empty(){ self.game_state.get_new_word();}
-        let scrambled_word = &self.game_state.scrambled_word;
+        if self.game_state.scrambled_word.is_empty(){
+            self.game_state.get_new_word();
+        }
+        let scrambled_word = &self.game_state.scrambled_word.clone();
         // Update time left
         let time_remaining = if let Some(res) = self.game_state.time_alotted.checked_sub(self.timer_start.elapsed()) {
             res
@@ -115,29 +125,33 @@ impl App for WordUnscramblerApp {
         // Build the UI
         TopBottomPanel::top("timer_bar").show(ctx, |ui|{ //Timer
             ui.heading(format!("Time left: {} seconds", time_remaining.as_secs()))
-        });
+        });//End Side Panel
         
         SidePanel::right("score_and_history").show(ctx, |ui|{ //Score and Guess History
             ui.heading(format!("Score: {}", self.game_state.score));
             ui.separator();
             ui.label(format!("Guess History: {}", self.guess_history.join("\n")))
-        });
+        });//End Side Panel
 
         CentralPanel::default().show(ctx, |ui| { //Game Area
-            //Instantiate UI elements
-            let mut i = 0.0;
-            let containers_with_letter: Vec<(Shape, char)> = scrambled_word.chars().map(|letter|{ 
-                i += 1.0; 
-                let position = (100.0 + (i * 55.0), 100.0);
+            if self.game_space == Rect::EVERYTHING{
+                self.game_space = ctx.available_rect();
+                self.scrambled_letter_anchors();
+                self.answer_letter_anchors();                
+            }
+            if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
+                        self.submit_input(); // Submit the input
+                    }
 
-                //Create a letter container 
-                (Shape::Rect(letter_square(50.0, position)), letter)
-            }).collect();//Collect individual container shapes into a vector
+            //Static UI Elements
+            ui.painter().add(ui_elements::scrambled_tray(scrambled_word.len(), ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
             
-            for (container, letter) in containers_with_letter {
+            self.ui_elements.generate_squares(&self.game_state.scrambled_word, &self.input_text);
+
+            for (container, letter) in &self.ui_elements.letter_squares {
                 match container{
                     Shape::Rect(container) => {
-                        ui.painter().add(container);
+                        ui.painter().add(*container);
                         ui.painter().text(
                             container.rect.center_bottom(),//Center of container
                             Align2::CENTER_BOTTOM, 
@@ -148,13 +162,28 @@ impl App for WordUnscramblerApp {
                             Color32::WHITE);},
                     _ => ()}//Return the empty container if wrong shape
             }
-        
-            //Display UI
-            ui.painter().add(ui_elements::scrambled_tray(50.0, 1, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))))
-        });
+
+            ui.input(|input_state|{
+                for event in &input_state.events{
+                   match event{
+                        Event::Text(text) => {
+                            let next_char = text.chars().next().unwrap();
+                            eprint!("{}", next_char);
+                            let re = Regex::new(&format!(r"{}", regex::escape(&next_char.to_string()))).unwrap();
+                            self.game_state.scrambled_word = re.replace(&self.game_state.scrambled_word, "").to_string();
+                            self.input_text.push(next_char);
+                        },
+                        Event::Key {key: egui::Key::Backspace, pressed: true, .. } => if !self.input_text.is_empty(){self.input_text.remove(self.input_text.len()-1);},
+                        Event::Key {key: egui::Key::Enter, pressed: true, ..  } => {
+                            self.submit_input();
+                            println!("{}", self.input_text);
+                            self.input_text.clear()},
+                        _ => ()};
+                }});//End Input
+        });//End Central Panel
 
         // Request repaint
-        //ctx.request_repaint_after(Duration::from_millis(100));
+        ctx.request_repaint_after(Duration::from_millis(100));
     }
 }
 
@@ -178,7 +207,6 @@ impl WordUnscramblerApp {
        if input.is_empty() {
            return;
        }
-       self.input_text.clear();
        self.game_state.validate_answer(input);
         
     }
@@ -213,9 +241,7 @@ fn main() {
                     ui.label("Your guess: "); // Display label
                     let response = ui.text_edit_singleline(&mut self.input_text); // Display text input
                     response.request_focus(); // Request focus for text input
-                    if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
-                        self.submit_input(); // Submit the input
-                    }
+                    
                 });
 
                 if ui.button("Submit").clicked() { // If the submit button is clicked

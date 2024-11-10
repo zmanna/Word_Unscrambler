@@ -11,3 +11,4 @@ ureq = { version = "2.5.0", features = ["json"] }
 rand = "0.8"
 eframe = "0.29.1"
 emath = "0.29.1"
+regex = "1"
