@@ -13,7 +13,9 @@ pub struct GameState {
     pub correct_answers: u8,      // Correct answer (determines word length)
     pub original_word: String,    // Original word (determines correct answer)
     pub scrambled_word: String,   // Scrambled word (determines order of letters from orig word presented to player)
+    pub restore_scrambled: String,
     pub level: u8,                // Level (increases for every 4 words)
+    pub start: bool
 }
 
 impl GameState {
@@ -25,7 +27,9 @@ impl GameState {
             correct_answers: 0,                    // Start at correct_answers 1 (+1 correct_answers every 4 words)
             original_word: String::new(),          // Initiate new word
             scrambled_word: String::new(),         // Scramble word
-            level: 1}                              // Start at level 1 (+1 level every 4 right answers)
+            restore_scrambled: String::new(),       // scrambled word for restoring when user gets it wrong
+            level: 1,                              // Start at level 1 (+1 level every 4 right answers)
+            start: true}
     }
 }
 
@@ -69,6 +73,7 @@ impl UpdateGameVariables for GameState{
     }
     
     fn set_word(&mut self, scrambled: String, original: String){
+        self.restore_scrambled = scrambled.clone();
         self.scrambled_word = scrambled;
         self.original_word = original;
     }
@@ -102,15 +107,15 @@ impl ValidateAnswer for GameState{
 
             let _ = sender.send((input, is_exact_match || is_valid_anagram)); //Return true if exact match, or anagram
         });
-
         match receiver.recv() {
             Ok((_, is_valid)) =>{
                 if is_valid { self.correct_answer() 
-                              .increment_word_length()
-                              .get_new_word();}
+                                .increment_word_length()
+                                .get_new_word();}
 
                 else { self.incorrect_answer();
-                       println!("{}", &self.original_word);}
+                    self.scrambled_word = self.restore_scrambled.clone();
+                    println!("{}", &self.original_word);}
             }
 
             Err(e) => eprint!("Error validating guess: {}", e)};

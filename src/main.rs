@@ -44,6 +44,7 @@ mod api;
 mod shape_builder;
 mod ui_elements;
 
+use api::get_scrambled_word;
 use eframe::egui::{Event, FontFamily, FontId, FontSelection};
 use eframe::{App, Frame};
 use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
@@ -109,9 +110,11 @@ impl App for WordUnscramblerApp {
     The function returns immediately after displaying the game over message.
      */
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        if self.game_state.scrambled_word.is_empty(){
+        if self.game_state.scrambled_word.is_empty() && self.input_text.is_empty() && self.game_state.start{
             self.game_state.get_new_word();
+            self.game_state.start = false;
         }
+
         let scrambled_word = &self.game_state.scrambled_word.clone();
         // Update time left
         let time_remaining = if let Some(res) = self.game_state.time_alotted.checked_sub(self.timer_start.elapsed()) {
@@ -140,7 +143,9 @@ impl App for WordUnscramblerApp {
                 self.answer_letter_anchors();                
             }
             if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
-                        self.submit_input(); // Submit the input
+                        //println!("first one: {}", self.input_text);
+                        //self.submit_input(); // Submit the input
+                        //self.input_text.clear();
                     }
 
             //Static UI Elements
@@ -168,15 +173,17 @@ impl App for WordUnscramblerApp {
                    match event{
                         Event::Text(text) => {
                             let next_char = text.chars().next().unwrap();
-                            eprint!("{}", next_char);
+                            if self.game_state.scrambled_word.contains(&String::from(next_char)) {
+                                self.input_text.push(next_char);
+                            }
+                            //eprint!("{}\n", self.input_text);
                             let re = Regex::new(&format!(r"{}", regex::escape(&next_char.to_string()))).unwrap();
                             self.game_state.scrambled_word = re.replace(&self.game_state.scrambled_word, "").to_string();
-                            self.input_text.push(next_char);
                         },
                         Event::Key {key: egui::Key::Backspace, pressed: true, .. } => if !self.input_text.is_empty(){self.input_text.remove(self.input_text.len()-1);},
                         Event::Key {key: egui::Key::Enter, pressed: true, ..  } => {
                             self.submit_input();
-                            println!("{}", self.input_text);
+                            println!("Scrambled Word: {}", self.game_state.scrambled_word);
                             self.input_text.clear()},
                         _ => ()};
                 }});//End Input
