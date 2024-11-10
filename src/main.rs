@@ -54,6 +54,8 @@ use std::env;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
+use crate::game_state::{ValidateAnswer, UpdateGameVariables};
+
 
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
@@ -99,11 +101,8 @@ impl App for WordUnscramblerApp {
     The function returns immediately after displaying the game over message.
      */
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        //Unpack game_state values
-        let mut scrambled_word = self.game_state.scrambled_word.clone();
-        let mut original_word = self.game_state.scrambled_word.clone();
-        
-        
+        if self.game_state.scrambled_word.is_empty(){ self.game_state.get_new_word();}
+        let scrambled_word = &self.game_state.scrambled_word;
         // Update time left
         let time_remaining = if let Some(res) = self.game_state.time_alotted.checked_sub(self.timer_start.elapsed()) {
             res
@@ -127,24 +126,29 @@ impl App for WordUnscramblerApp {
         CentralPanel::default().show(ctx, |ui| { //Game Area
             //Instantiate UI elements
             let mut i = 0.0;
-            for letter in scrambled_word.chars(){ 
+            let containers_with_letter: Vec<(Shape, char)> = scrambled_word.chars().map(|letter|{ 
                 i += 1.0; 
                 let position = (100.0 + (i * 55.0), 100.0);
 
-                //Paint letters from the scrambled word
-                ui.painter().text(
-                    Pos2::from(position), 
-                    Align2::CENTER_BOTTOM, 
-                    letter,
-                    FontId::new(
-                        40.,
-                        FontFamily::Monospace),
-                    Color32::WHITE);
-                
-                //Paint the letter containers
-                ui.painter().add(Shape::Rect(letter_square(50.0, position)));
-            };
-
+                //Create a letter container 
+                (Shape::Rect(letter_square(50.0, position)), letter)
+            }).collect();//Collect individual container shapes into a vector
+            
+            for (container, letter) in containers_with_letter {
+                match container{
+                    Shape::Rect(container) => {
+                        ui.painter().add(container);
+                        ui.painter().text(
+                            container.rect.center_bottom(),//Center of container
+                            Align2::CENTER_BOTTOM, 
+                            letter,
+                            FontId::new(
+                                40.,
+                                FontFamily::Monospace),
+                            Color32::WHITE);},
+                    _ => ()}//Return the empty container if wrong shape
+            }
+        
             //Display UI
             ui.painter().add(ui_elements::scrambled_tray(50.0, 1, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))))
         });
@@ -170,37 +174,18 @@ impl WordUnscramblerApp {
            - If not an exact match, checks if the input is a valid word and can form an anagram of the original word.
            - Sends the result (input and validation status) back through the channel.
         */
-        let input = self.input_text.trim().to_string();
-        if input.is_empty() {
-            return;
-        }
-        self.input_text.clear();
-
-        let original_word = self.game_state.original_word.clone();
-        let (sender, receiver) = std::sync::mpsc::channel();
-        self.validation_receiver = Some(receiver);
-
-        // Spawn a background thread
-        std::thread::spawn(move || {
-            let is_exact_match = input == original_word;
-            let is_valid_anagram = if !is_exact_match {
-                api::is_valid_word(&input) && can_form_anagram(&input, &original_word)
-            } else {
-                false
-            };
-            let _ = sender.send((input, is_exact_match || is_valid_anagram));
-        });
+       let input = self.input_text.trim().to_string();
+       if input.is_empty() {
+           return;
+       }
+       self.input_text.clear();
+       self.game_state.validate_answer(input);
+        
     }
 }
 
 // Helper function to check if `input` can be formed from letters in `original`
-fn can_form_anagram(input: &str, original: &str) -> bool {
-    let mut input_chars: Vec<char> = input.chars().collect(); // Convert input to a vector of characters
-    let mut original_chars: Vec<char> = original.chars().collect(); // Convert original to a vector of characters
-    input_chars.sort_unstable(); // Sort the input characters
-    original_chars.sort_unstable(); // Sort the original characters
-    input_chars == original_chars // Check if the sorted input characters match the sorted original characters
-}
+
 
 fn main() {
     //env::set_var("RUST_BACKTRACE", "1");
