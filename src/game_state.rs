@@ -121,14 +121,17 @@ impl ValidateAnswer for GameState{
             Ok((_, is_valid)) =>{
                 if is_valid { self.correct_answer() 
                                 .increment_word_length()
-                                .get_new_word();}
+                                .get_new_word();
+                              true}
 
                 else { self.incorrect_answer();
                     self.scrambled_word = self.restore_scrambled.clone();
-                    println!("{}", &self.original_word);}
+                    println!("{}", &self.original_word);
+                       false}
             }
 
-            Err(e) => eprint!("Error validating guess: {}", e)};
+            Err(e) => {eprint!("Error validating guess: {}", e);
+                       false}}
     }
 */
     fn can_form_anagram(input: String, original: String) -> bool {

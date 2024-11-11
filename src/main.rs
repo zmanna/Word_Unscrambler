@@ -51,7 +51,7 @@ use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefini
 use emath::Align2;
 use game_state::GameState;
 use shape_builder::{ShapeAttributes, RoundingType, Dimensions};
-use ui_elements::{letter_square, GenerateAnchors, GenerateUiShapes, UiElements};
+use ui_elements::{guess_boxes, letter_square, GenerateAnchors, GenerateUiShapes, UiElements};
 use std::any::Any;
 use std::borrow::Borrow;
 use std::env;
@@ -65,7 +65,7 @@ use regex::Regex;
 #[serde(default)]
 pub struct WordUnscramblerApp {
     game_state: game_state::GameState,
-    guess_history: Vec<String>,
+    guess_history: Vec<(String, bool)>,
     input_text: String,
     #[serde(skip)]
     timer_start: Instant,
@@ -156,6 +156,18 @@ impl App for WordUnscramblerApp {
             Duration::ZERO //Prevent overflow by setting duration to zero if time elapsed is greater than time alotted
         };
 
+        if self.game_over {
+            CentralPanel::default().show(ctx, |ui| {
+                ui.heading("Game Over!");
+                ui.label(format!("Final Score: {}", self.game_state.score));
+                ui.label("Thank you for playing!");
+            });
+    
+            // Request repaint every 100ms to keep the UI responsive
+            ctx.request_repaint_after(Duration::from_millis(100));
+            return; // Exit update loop since the game is over
+        }
+
         // Build the UI
         TopBottomPanel::top("timer_bar").show(ctx, |ui|{ //Timer
             ui.heading(format!("Time left: {} seconds", time_remaining.as_secs()))
@@ -164,17 +176,28 @@ impl App for WordUnscramblerApp {
         SidePanel::right("score_and_history").show(ctx, |ui|{ //Score and Guess History
             ui.heading(format!("Score: {}", self.game_state.score));
             ui.separator();
-            ui.label(format!("Guess History: {}", self.guess_history.join("\n")))
+            ui.label(format!("Guess History:"));
+            let mut i = 3.0;
+            for (guess, valid) in &self.guess_history{
+                let guess_container = guess_boxes(ui.available_size(), Pos2::new(ctx.available_rect().right() - ui.available_size().x, 30.0 * i), valid);
+                ui.painter().add(guess_container);
+                i += 1.0;
+                ui.painter().text(
+                    guess_container.rect.center(),
+                    Align2::CENTER_CENTER,
+                    guess,
+                    FontId::new(
+                        20.0,
+                        FontFamily::Monospace),
+                    Color32::WHITE);
+            }
         });//End Side Panel
 
         CentralPanel::default().show(ctx, |ui| { //Game Area
-            if self.game_space == Rect::EVERYTHING{
                 self.game_space = ctx.available_rect();               
-            }
-            if self.ui_elements.scrambled_anchors.len() < self.game_state.scrambled_word.len() {
                 self.scrambled_letter_anchors();
                 self.answer_letter_anchors(); 
-            }
+
             if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
                         //println!("first one: {}", self.input_text);
                         //self.submit_input(); // Submit the input
@@ -211,20 +234,21 @@ impl App for WordUnscramblerApp {
                             }
                             //eprint!("{}\n", self.input_text);
                             let re = Regex::new(&format!(r"{}", regex::escape(&next_char.to_string()))).unwrap();
-                            self.game_state.scrambled_word = re.replace(&self.game_state.scrambled_word, "").to_string();
-                        },
+                            self.game_state.scrambled_word = re.replace(&self.game_state.scrambled_word, "").to_string();},
+
                         Event::Key {key: egui::Key::Backspace, pressed: true, .. } => {
                             if !self.input_text.is_empty(){
                                 let last_char = self.input_text.chars().next_back().unwrap();
                                 self.game_state.scrambled_word.push(last_char);
-                                self.input_text.remove(self.input_text.len()-1);
-                            }
-                        },
+                                self.input_text.remove(self.input_text.len()-1);}},
+
                         Event::Key {key: egui::Key::Enter, pressed: true, ..  } => {
                             self.submit_input();
                             println!("Scrambled Word: {}", self.game_state.scrambled_word);
                             self.input_text.clear()},
+
                         _ => ()};
+
                 }});//End Input
         });//End Central Panel
 
@@ -254,7 +278,7 @@ impl WordUnscramblerApp {
            return;
        }
        self.validate(input, self.game_state.original_word.clone());
-        
+       self.guess_history.push((self.input_text.clone(), self.game_state.validate_answer(input)));
     }
 }
 

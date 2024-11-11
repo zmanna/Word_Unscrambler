@@ -34,7 +34,7 @@ impl GenerateAnchors for WordUnscramblerApp {
         let mut i: f32 = 1.0;
 
         for _ in 0..self.game_state.word_length {
-            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH 
+            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_BUFFER 
                          + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
 
             self.ui_elements.scrambled_anchors.push(
@@ -53,13 +53,13 @@ impl GenerateAnchors for WordUnscramblerApp {
         let mut i: f32 = 1.0;
 
         for _ in 0..self.game_state.word_length {
-            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH 
-                         + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
+            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_BUFFER 
+                         + (self.game_state.word_length / 2 - 1) as f32 * 5.0;
 
             self.ui_elements.answer_anchors.push(
                 self.game_space.center_bottom() 
                 - Vec2::from((offset, 0.0)) 
-                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 100.0))
+                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 95.0))
             );
             i += 1.0;
         }
@@ -104,14 +104,24 @@ pub fn letter_square(pos: Pos2) ->  RectShape{
 }
 
 pub fn scrambled_tray(letters: usize, pos: Pos2) -> RectShape{
-    let tray_width = CONTAINER_WIDTH * letters as f32;
+    let tray_width = CONTAINER_BUFFER * letters as f32;
     let attr = ShapeAttributes{
         dimensions: Dimensions::HeightWidth(
             CONTAINER_WIDTH + 10.0, tray_width + 10.0,
             pos - Vec2::from((tray_width/2.0, 0.0))),
-        fill_color: Color32::LIGHT_GRAY,
-        rounding: RoundingType::None,
-        outline: Stroke::from((2.0, Color32::GOLD))
+        fill_color: Color32::DARK_GRAY,
+        rounding: RoundingType::UniformRounding(3.0),
+        outline: Stroke::from((2.0, Color32::LIGHT_GRAY))
+    };
+    RectShape::from(attr)
+}
+
+pub fn guess_boxes(width: Vec2, pos: Pos2, correct: &bool) -> RectShape{
+    let attr = ShapeAttributes{
+        dimensions: Dimensions::HeightWidth(20.0, width.x, pos),
+        fill_color: Color32::BLACK,
+        rounding: RoundingType::UniformRounding(4.0),
+        outline: Stroke::from((2.0, if *correct{Color32::GREEN} else {Color32::RED}))        
     };
     RectShape::from(attr)
 }
