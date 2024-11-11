@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "Lsn/4OgfVve6Ir9c6LzrbEVsXz1LLgUYhWbfW9hkDSE=",
+  "Source": "RustGameAPI",
+  "BasePath": "_content/RustGameAPI",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
