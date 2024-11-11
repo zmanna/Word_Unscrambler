@@ -34,7 +34,7 @@ impl GameState {
 }
 
 pub trait ValidateAnswer{
-    fn validate_answer(&mut self, input: String);
+    fn validate_answer(&mut self, input: String) -> bool;
     fn can_form_anagram(input: String, original: String) -> bool;
 }
 pub trait UpdateGameVariables{
@@ -97,7 +97,7 @@ impl UpdateGameVariables for GameState{
 }
 
 impl ValidateAnswer for GameState{
-    fn validate_answer(&mut self, input: String){
+    fn validate_answer(&mut self, input: String) -> bool{
         let (sender, receiver) = std::sync::mpsc::channel();
         let original_word = self.original_word.clone();
         // Spawn a background thread
@@ -111,14 +111,17 @@ impl ValidateAnswer for GameState{
             Ok((_, is_valid)) =>{
                 if is_valid { self.correct_answer() 
                                 .increment_word_length()
-                                .get_new_word();}
+                                .get_new_word();
+                              true}
 
                 else { self.incorrect_answer();
                     self.scrambled_word = self.restore_scrambled.clone();
-                    println!("{}", &self.original_word);}
+                    println!("{}", &self.original_word);
+                       false}
             }
 
-            Err(e) => eprint!("Error validating guess: {}", e)};
+            Err(e) => {eprint!("Error validating guess: {}", e);
+                       false}}
     }
 
     fn can_form_anagram(input: String, original: String) -> bool {
