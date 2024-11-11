@@ -1,8 +1,9 @@
 use std::time::Duration;             // Timer 
 use serde::{Serialize, Deserialize}; // Used to convert to JSON for saving game
 use std::sync::mpsc::Receiver;
+use queues::*;
 
-use crate::api;                      // Use dictionary API
+use crate::api::{self, WordApi};                      // Use dictionary API
 
 // Structure to represent the game state with serialize and deserialize to convert to JSON to be stored for later
 #[derive(Serialize, Deserialize)]
@@ -15,7 +16,7 @@ pub struct GameState {
     pub scrambled_word: String,   // Scrambled word (determines order of letters from orig word presented to player)
     pub restore_scrambled: String,
     pub level: u8,                // Level (increases for every 4 words)
-    pub start: bool
+    pub start: bool,
 }
 
 impl GameState {
@@ -29,12 +30,13 @@ impl GameState {
             scrambled_word: String::new(),         // Scramble word
             restore_scrambled: String::new(),       // scrambled word for restoring when user gets it wrong
             level: 1,                              // Start at level 1 (+1 level every 4 right answers)
-            start: true}
+            start: true,
+        }
     }
 }
 
 pub trait ValidateAnswer{
-    fn validate_answer(&mut self, input: String);
+    //fn validate_answer(&mut self, api: WordApi, input: String);
     fn can_form_anagram(input: String, original: String) -> bool;
 }
 pub trait UpdateGameVariables{
@@ -79,6 +81,7 @@ impl UpdateGameVariables for GameState{
     }
 
     fn get_new_word (&mut self){
+        /*
         let (sender, receiver) = std::sync::mpsc::channel(); //Send to, and receive from the API
         let word_length = self.word_length;
 
@@ -93,17 +96,24 @@ impl UpdateGameVariables for GameState{
             Ok((scrambled, original)) => self.set_word(scrambled, original),
             Err(e) => self.set_word("ERROR".into(), "ERROR".into()),
         }
+        
+        let word = 
+        let scrambled = api::scramble_word(word)
+        self.set_word()
+        */
     }
 }
 
+
 impl ValidateAnswer for GameState{
-    fn validate_answer(&mut self, input: String){
+    /* 
+    fn validate_answer(&mut self, api: WordApi, input: String){
         let (sender, receiver) = std::sync::mpsc::channel();
         let original_word = self.original_word.clone();
         // Spawn a background thread
         std::thread::spawn(move || {
             let is_exact_match = input == original_word;
-            let is_valid_anagram = api::is_valid_word(&input) && GameState::can_form_anagram(input.clone(), original_word);
+            let is_valid_anagram = api.is_valid_word(&input) && GameState::can_form_anagram(input.clone(), original_word);
 
             let _ = sender.send((input, is_exact_match || is_valid_anagram)); //Return true if exact match, or anagram
         });
@@ -120,7 +130,7 @@ impl ValidateAnswer for GameState{
 
             Err(e) => eprint!("Error validating guess: {}", e)};
     }
-
+*/
     fn can_form_anagram(input: String, original: String) -> bool {
         let mut input_chars: Vec<char> = input.chars().collect(); // Convert input to a vector of characters
         let mut original_chars: Vec<char> = original.chars().collect(); // Convert original to a vector of characters

@@ -1,35 +1,77 @@
 use rand::seq::SliceRandom; // Import SliceRandom to shuffle slices
-use ureq;                   // Import ureq for HTTP requests
+use reqwest::Client;
 
-// Function to get random word from API return scrambled version
-pub fn get_scrambled_word(length: usize) -> Option<(String, String)> {
-    let url = format!(
-        "https://random-word-api.herokuapp.com/word?number=1&length={}", // URL for random word API fitting length requirements
-        length
-    );
-    let response = ureq::get(&url).call().ok()?;                         // GET request to API; get response
-    let words: Vec<String> = response.into_json().ok()?;                 // parse response into JSON vector of words (none if it fails to parse)
 
-    if let Some(word) = words.first() {                                  // If word has been retrieved
-        let mut chars: Vec<char> = word.chars().collect();               // Split original word into vector of chars
-        chars.shuffle(&mut rand::thread_rng());                          // Scramble chars 
-        let scrambled_word: String = chars.into_iter().collect();        // Form string from scrambled chars
-        Some((scrambled_word, word.clone()))                             // Tuple containing orginal and scrambled word
-    } else {                                                             // If no word retrieved, return none
-        None
+pub struct WordApi {
+    pub buffer: Vec<String>,
+    pub word_length: usize,
+    pub num_words: usize,
+    pub client: Client
+}
+
+pub trait MakeRequest {
+    async fn get_words(&mut self) -> &mut Self;
+    async fn is_valid_word(&self, word: &str) -> bool;
+    fn scramble_word(&self, word: &str) -> String;
+}
+
+impl Default for WordApi {
+    fn default() -> Self {
+        Self {
+            buffer: Vec::new(),
+            word_length: Default::default(),
+            num_words: Default::default(),
+            client: Client::new()
+        }
     }
 }
 
-// Function to check for validity of word referencing the dictionary API
-pub fn is_valid_word(word: &str) -> bool {
-    let url = format!("https://api.dictionaryapi.dev/api/v2/entries/en/{}", word);  // URL of dictionary API
-    let response = ureq::get(&url).call();                                          // GET request to API; get response
+/*
+if let Some(word) - words.first() {
+    let mut chars: Vec<char> word.chars().collect();
+    chars.shuffle(&mut rand::thread_rng());
+    let scrambled_word: String = chars.into_iter().collect();
+    Some((scrambled_word, word.clone()))
+} else {
+    None
+}
+    */
 
-    // Check if response is successful and return true/false depending on that success
-    match response {
-        Ok(resp) => resp.status() == 200,
-        Err(_) => false,
+impl MakeRequest for WordApi {
+    async fn get_words(&mut self) -> &mut Self {
+        let url = format!(
+            "https://random-word-api.herokuapp.com/word?number={}&&length={}", // URL for random word API fitting length requirements
+            self.num_words,
+            self.word_length
+        );
+        let result = self.client.get(url).send().await.expect("Request for words failed").text().await.expect("Failed to convert to text");
+        self.buffer = result.split(',').map(| word | String::from(word).chars().filter( | c | !['[', ']', '\"'].contains(c)).collect()).collect();
+        self
+    }
+
+    // Function to check for validity of word referencing the dictionary API
+    async fn is_valid_word(&self, word: &str) -> bool {
+        let url = format!("https://api.dictionaryapi.dev/api/v2/entries/en/{}", word);  // URL of dictionary API
+        let response = self.client.get(url).send().await;                                          // GET request to API; get response
+
+        // Check if response is successful and return true/false depending on that success
+        match response {
+            Ok(resp) => resp.status() == 200,
+            Err(_) => false,
+        }
+    }
+
+    fn scramble_word(&self, word: &str) -> String {
+        let mut chars: Vec<char> = word.chars().collect();
+        chars.shuffle(&mut rand::thread_rng());
+        let scrambled_word: String = chars.into_iter().collect();
+        scrambled_word
     }
 }
 
-
+pub fn scramble_word(word: String) -> String {
+    let mut chars: Vec<char> = word.chars().collect();
+    chars.shuffle(&mut rand::thread_rng());
+    let scrambled_word: String = chars.into_iter().collect();
+    scrambled_word
+}

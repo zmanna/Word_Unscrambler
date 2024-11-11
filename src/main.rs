@@ -44,11 +44,12 @@ mod api;
 mod shape_builder;
 mod ui_elements;
 
-use api::get_scrambled_word;
+use api::{ WordApi, MakeRequest };
 use eframe::egui::{Event, FontFamily, FontId, FontSelection};
 use eframe::{App, Frame};
 use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
 use emath::Align2;
+use game_state::GameState;
 use shape_builder::{ShapeAttributes, RoundingType, Dimensions};
 use ui_elements::{letter_square, GenerateAnchors, GenerateUiShapes, UiElements};
 use std::any::Any;
@@ -78,6 +79,8 @@ pub struct WordUnscramblerApp {
     ui_elements: UiElements,
     #[serde(skip)]
     game_space: Rect,
+    #[serde(skip)]
+    api: WordApi
 }
 
 impl Default for WordUnscramblerApp {
@@ -94,9 +97,31 @@ impl Default for WordUnscramblerApp {
             correct: String::new(),
             ui_elements: UiElements::default(),
             game_space: Rect::EVERYTHING,
+            api: WordApi::default()
         }
     }
 }
+
+trait AsyncFunctions {
+    async fn validate(&mut self, input: String, original_word: String);
+
+}
+
+impl AsyncFunctions for WordUnscramblerApp {
+    async fn validate(&mut self, input: String, original_word: String){
+        let is_exact_match = input == original_word;
+        let is_valid_anagram = self.api.is_valid_word(&input).await && GameState::can_form_anagram(input, original_word);
+
+        if (is_exact_match || is_valid_anagram) {
+            self.game_state.correct_answer()
+                .increment_word_length()
+                .get_new_word();
+        } else {
+            self.game_state.incorrect_answer();
+            self.game_state.scrambled_word = self.game_state.restore_scrambled.clone();
+            println!("{}", &self.game_state.original_word);}
+        }
+    }
 
 impl App for WordUnscramblerApp {
     /*
@@ -110,12 +135,18 @@ impl App for WordUnscramblerApp {
     The function returns immediately after displaying the game over message.
      */
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        if self.game_state.scrambled_word.is_empty() && self.input_text.is_empty() && self.game_state.start{
-            self.game_state.get_new_word();
-            self.game_state.start = false;
+        if self.api.buffer.len() == 0 {
+            self.api.get_words();
         }
 
-        let scrambled_word = &self.game_state.scrambled_word.clone();
+        if self.game_state.scrambled_word.is_empty() && self.input_text.is_empty() && self.game_state.start{
+            let word = self.api.buffer.pop().unwrap();
+            let scrambled = api::scramble_word(word.clone());
+            self.game_state.set_word(scrambled, word);
+            self.game_state.start = false;
+        }
+        
+        //let scrambled_word = &self.game_state.scrambled_word.clone();
         // Update time left
         let time_remaining = if let Some(res) = self.game_state.time_alotted.checked_sub(self.timer_start.elapsed()) {
             res
@@ -222,7 +253,7 @@ impl WordUnscramblerApp {
        if input.is_empty() {
            return;
        }
-       self.game_state.validate_answer(input);
+       self.validate(input, self.game_state.original_word.clone());
         
     }
 }
