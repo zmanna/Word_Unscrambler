@@ -27,32 +27,48 @@ pub trait GenerateUiShapes{
     fn generate_squares(&mut self, scrambled: &String, input: &String) -> &mut Self;
 }
 
-impl GenerateAnchors for WordUnscramblerApp{
-    fn scrambled_letter_anchors(&mut self) -> &mut Self{
+impl GenerateAnchors for WordUnscramblerApp {
+    fn scrambled_letter_anchors(&mut self) -> &mut Self {
+        // Clear existing anchors and recalculate based on `word_length`
+        self.ui_elements.scrambled_anchors.clear();
         let mut i: f32 = 1.0;
 
-        for _letter in self.game_state.scrambled_word.chars(){
-            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
+        for _ in 0..self.game_state.word_length {
+            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH 
+                         + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
 
             self.ui_elements.scrambled_anchors.push(
-                self.game_space.center() - Vec2::from((offset, 0.0)) - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 0.0 )));
-                i += 1.0};
+                self.game_space.center() 
+                - Vec2::from((offset, 0.0)) 
+                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 0.0))
+            );
+            i += 1.0;
+        }
         self
     }
 
-    fn answer_letter_anchors(&mut self) -> &mut Self{
+    fn answer_letter_anchors(&mut self) -> &mut Self {
+        // Clear existing anchors and recalculate based on `word_length`
+        self.ui_elements.answer_anchors.clear();
         let mut i: f32 = 1.0;
 
-        for _letter in self.game_state.scrambled_word.chars(){
-            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
+        for _ in 0..self.game_state.word_length {
+            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH 
+                         + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
+
             self.ui_elements.answer_anchors.push(
-                self.game_space.center_bottom() - Vec2::from((offset, 0.0)) - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 100.0 )));
-            i += 1.0};
+                self.game_space.center_bottom() 
+                - Vec2::from((offset, 0.0)) 
+                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 100.0))
+            );
+            i += 1.0;
+        }
         self
     }
 }
 
-impl GenerateUiShapes for UiElements{
+
+impl GenerateUiShapes for UiElements {
     fn place_in_scrambled(&self, position: usize) -> Shape {
         Shape::Rect(letter_square(self.scrambled_anchors[position]))
     }
@@ -61,19 +77,16 @@ impl GenerateUiShapes for UiElements{
         Shape::Rect(letter_square(self.answer_anchors[position]))
     }
 
-    fn generate_squares(&mut self, scrambled: &String, input: &String) -> &mut Self{
+    fn generate_squares(&mut self, scrambled: &String, input: &String) -> &mut Self {
         self.letter_squares.clear();
-        let mut scrambled_index = 0;
-        let mut input_index = 0;
-        for letter in scrambled.chars(){
-            self.letter_squares.push(
-                (self.place_in_scrambled(scrambled_index), letter));
-            scrambled_index += 1;
+        let scrambled_chars = scrambled.chars().collect::<Vec<_>>();
+        let input_chars = input.chars().collect::<Vec<_>>();
+
+        for (i, letter) in scrambled_chars.iter().enumerate() {
+            self.letter_squares.push((self.place_in_scrambled(i), *letter));
         }
-        for letter in input.chars(){
-            self.letter_squares.push(
-                (self.place_in_answer(input_index), letter));
-            input_index += 1;
+        for (i, letter) in input_chars.iter().enumerate() {
+            self.letter_squares.push((self.place_in_answer(i), *letter));
         }
         self
     }
