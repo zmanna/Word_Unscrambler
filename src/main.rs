@@ -21,13 +21,14 @@ Creation Date: 10/25/2024F
 
 Dates revised:
 - 10/27/2024: Build UI (Paul Dykes) and refactor code to fit UI (John Mosley, Spencer Addis, Aryamann Zutshi, Willem Battey)
+-11/10/2024: Refactor code and elaborate on the UI (Spencer, John, Paul) and build SQL database (Willem) and implemnent tokio (John, Paul, Aryamann)
 
 Preconditions:
 - User-inputted words: unscramble the presented word (String)
 
 Postconditions:
 - Correct/Incorrect: display whether user answered correctly (move to next word) or incorrectly (stay on current word) (String)
-00
+
 Side Effects:
 - Altering the UI with new words
 
