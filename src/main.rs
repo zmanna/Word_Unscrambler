@@ -138,9 +138,11 @@ impl App for WordUnscramblerApp {
 
         CentralPanel::default().show(ctx, |ui| { //Game Area
             if self.game_space == Rect::EVERYTHING{
-                self.game_space = ctx.available_rect();
+                self.game_space = ctx.available_rect();               
+            }
+            if self.ui_elements.scrambled_anchors.len() < self.game_state.scrambled_word.len() {
                 self.scrambled_letter_anchors();
-                self.answer_letter_anchors();                
+                self.answer_letter_anchors(); 
             }
             if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
                         //println!("first one: {}", self.input_text);
@@ -149,7 +151,7 @@ impl App for WordUnscramblerApp {
                     }
 
             //Static UI Elements
-            ui.painter().add(ui_elements::scrambled_tray(scrambled_word.len(), ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
+            ui.painter().add(ui_elements::scrambled_tray(self.game_state.word_length, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
             
             self.ui_elements.generate_squares(&self.game_state.scrambled_word, &self.input_text);
 
@@ -180,7 +182,13 @@ impl App for WordUnscramblerApp {
                             let re = Regex::new(&format!(r"{}", regex::escape(&next_char.to_string()))).unwrap();
                             self.game_state.scrambled_word = re.replace(&self.game_state.scrambled_word, "").to_string();
                         },
-                        Event::Key {key: egui::Key::Backspace, pressed: true, .. } => if !self.input_text.is_empty(){self.input_text.remove(self.input_text.len()-1);},
+                        Event::Key {key: egui::Key::Backspace, pressed: true, .. } => {
+                            if !self.input_text.is_empty(){
+                                let last_char = self.input_text.chars().next_back().unwrap();
+                                self.game_state.scrambled_word.push(last_char);
+                                self.input_text.remove(self.input_text.len()-1);
+                            }
+                        },
                         Event::Key {key: egui::Key::Enter, pressed: true, ..  } => {
                             self.submit_input();
                             println!("Scrambled Word: {}", self.game_state.scrambled_word);

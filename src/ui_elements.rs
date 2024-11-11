@@ -3,6 +3,7 @@ use shape_builder::{ShapeAttributes, Dimensions, RoundingType};
 use eframe::{egui::{Color32, Shape, Stroke}, epaint::{Fonts, RectShape, TextShape}};
 use emath::{Pos2, Rect, Vec2};
 use std::{default::Default, ops::Range};
+use std::ops::Mul;
 
 static CONTAINER_WIDTH: f32 = 50.0;
 static CONTAINER_BUFFER: f32 = CONTAINER_WIDTH + 5.0;
@@ -30,10 +31,11 @@ impl GenerateAnchors for WordUnscramblerApp{
     fn scrambled_letter_anchors(&mut self) -> &mut Self{
         let mut i: f32 = 1.0;
 
-        for letter in self.game_state.scrambled_word.chars(){
+        for _letter in self.game_state.scrambled_word.chars(){
+            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
 
             self.ui_elements.scrambled_anchors.push(
-                self.game_space.center() - Vec2::from(((i * CONTAINER_BUFFER) - CONTAINER_BUFFER, 0.0 )));
+                self.game_space.center() - Vec2::from((offset, 0.0)) - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 0.0 )));
                 i += 1.0};
         self
     }
@@ -41,10 +43,10 @@ impl GenerateAnchors for WordUnscramblerApp{
     fn answer_letter_anchors(&mut self) -> &mut Self{
         let mut i: f32 = 1.0;
 
-        for letter in self.game_state.scrambled_word.chars(){
-
+        for _letter in self.game_state.scrambled_word.chars(){
+            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_WIDTH + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
             self.ui_elements.answer_anchors.push(
-                self.game_space.center_bottom() - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 100.0 )));
+                self.game_space.center_bottom() - Vec2::from((offset, 0.0)) - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 100.0 )));
             i += 1.0};
         self
     }

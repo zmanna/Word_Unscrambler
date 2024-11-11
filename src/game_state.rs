@@ -119,7 +119,6 @@ impl ValidateAnswer for GameState{
             }
 
             Err(e) => eprint!("Error validating guess: {}", e)};
-        
     }
 
     fn can_form_anagram(input: String, original: String) -> bool {
