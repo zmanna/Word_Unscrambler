@@ -43,7 +43,7 @@ pub trait UpdateGameVariables{
     fn increment_word_length(&mut self) -> &mut Self;
     fn correct_answer(&mut self) -> &mut Self;
     fn incorrect_answer(&mut self) -> &mut Self;
-    fn set_word(&mut self, scrambled: String, original: String);
+    fn set_word(&mut self, scrambled_and_original: (String, String));
     fn get_new_word(&mut self);
 }
 
@@ -74,10 +74,11 @@ impl UpdateGameVariables for GameState{
         self
     }
     
-    fn set_word(&mut self, scrambled: String, original: String){
+    fn set_word(&mut self, (scrambled, original): (String, String)){
         self.restore_scrambled = scrambled.clone();
         self.scrambled_word = scrambled;
         self.original_word = original;
+        println!("{}, {}", self.scrambled_word, self.original_word);
     }
 
     fn get_new_word (&mut self){

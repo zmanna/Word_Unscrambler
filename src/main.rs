@@ -43,6 +43,7 @@ mod game_state;
 mod api;
 mod shape_builder;
 mod ui_elements;
+use tokio::{self, runtime::Runtime};
 
 use api::{ WordApi, MakeRequest };
 use eframe::egui::{Event, FontFamily, FontId, FontSelection};
@@ -80,7 +81,7 @@ pub struct WordUnscramblerApp {
     #[serde(skip)]
     game_space: Rect,
     #[serde(skip)]
-    api: WordApi
+    api: WordApi,
 }
 
 impl Default for WordUnscramblerApp {
@@ -97,29 +98,32 @@ impl Default for WordUnscramblerApp {
             correct: String::new(),
             ui_elements: UiElements::default(),
             game_space: Rect::EVERYTHING,
-            api: WordApi::default()
+            api: WordApi::default(),
         }
     }
 }
 
 trait AsyncFunctions {
-    async fn validate(&mut self, input: String, original_word: String);
+    async fn validate(&mut self, input: String, original_word: String) -> bool;
 
 }
 
 impl AsyncFunctions for WordUnscramblerApp {
-    async fn validate(&mut self, input: String, original_word: String){
+    async fn validate(&mut self, input: String, original_word: String) -> bool{
         let is_exact_match = input == original_word;
         let is_valid_anagram = self.api.is_valid_word(&input).await && GameState::can_form_anagram(input, original_word);
 
-        if (is_exact_match || is_valid_anagram) {
+        if is_exact_match || is_valid_anagram {
             self.game_state.correct_answer()
                 .increment_word_length()
                 .get_new_word();
+            true
         } else {
             self.game_state.incorrect_answer();
             self.game_state.scrambled_word = self.game_state.restore_scrambled.clone();
-            println!("{}", &self.game_state.original_word);}
+            println!("{}", &self.game_state.original_word);
+            false
+        }
         }
     }
 
@@ -135,15 +139,17 @@ impl App for WordUnscramblerApp {
     The function returns immediately after displaying the game over message.
      */
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
+        /* 
         if self.api.buffer.len() == 0 {
-            self.api.get_words();
+            self.api.get_next_word();
         }
+        */
 
         if self.game_state.scrambled_word.is_empty() && self.input_text.is_empty() && self.game_state.start{
-            let word = self.api.buffer.pop().unwrap();
-            let scrambled = api::scramble_word(word.clone());
-            self.game_state.set_word(scrambled, word);
-            self.game_state.start = false;
+            if self.api.buffer.len() == 0 {
+                self.game_state.set_word(self.api.get_next_word());
+                self.game_state.start = false;
+            }
         }
         
         //let scrambled_word = &self.game_state.scrambled_word.clone();
@@ -244,6 +250,8 @@ impl App for WordUnscramblerApp {
 
                         Event::Key {key: egui::Key::Enter, pressed: true, ..  } => {
                             self.submit_input();
+
+                            //self.submit_input();
                             println!("Scrambled Word: {}", self.game_state.scrambled_word);
                             self.input_text.clear()},
 
@@ -258,7 +266,7 @@ impl App for WordUnscramblerApp {
 }
 
 impl WordUnscramblerApp {
-   fn submit_input(&mut self) {
+   async fn submit_input(&mut self) {
         /*  
         The submit_input/1 function processes the user's input in the WordUnscramblerApp.
         It performs the following steps:
@@ -277,15 +285,18 @@ impl WordUnscramblerApp {
        if input.is_empty() {
            return;
        }
-       self.validate(input, self.game_state.original_word.clone());
-       self.guess_history.push((self.input_text.clone(), self.game_state.validate_answer(input)));
+       //self.validate(input, self.game_state.original_word.clone()).await;
+       let valid = self.validate(input, self.game_state.original_word.clone()).await;
+       self.guess_history.push((self.input_text.clone(), valid));
+       if valid {
+        self.game_state.set_word(self.api.get_next_word())
+       }
     }
 }
 
 // Helper function to check if `input` can be formed from letters in `original`
-
-
-fn main() {
+#[tokio::main]
+async fn main() {
     //env::set_var("RUST_BACKTRACE", "1");
     let native_options = eframe::NativeOptions::default(); // Create default native options
     let _ = eframe::run_native( // Run the native app
