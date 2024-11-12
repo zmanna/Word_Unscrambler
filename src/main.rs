@@ -34,7 +34,7 @@ Side Effects:
 
 Invariants:
 - Game loop (until timer ends)
-
+nn
 Known Faults:
 - Save feature is not integrated into the game yet
 
@@ -46,26 +46,23 @@ mod shape_builder;
 mod ui_elements;
 use tokio::{self, runtime::Runtime};
 
-use api::{ WordApi, MakeRequest };
+use api::{ WordApi, MakeRequest};
 use eframe::egui::{Event, FontFamily, FontId, FontSelection};
 use eframe::{App, Frame};
 use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
 use emath::Align2;
-use game_state::GameState;
 use shape_builder::{ShapeAttributes, RoundingType, Dimensions};
 use ui_elements::{guess_boxes, letter_square, GenerateAnchors, GenerateUiShapes, UiElements};
-use std::any::Any;
-use std::borrow::Borrow;
-use std::env;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
-use crate::game_state::{ValidateAnswer, UpdateGameVariables};
+use crate::game_state::UpdateGameVariables;
 use regex::Regex;
 
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct WordUnscramblerApp {
+    #[serde(skip)]
     game_state: game_state::GameState,
     guess_history: Vec<(String, bool)>,
     input_text: String,
@@ -81,8 +78,6 @@ pub struct WordUnscramblerApp {
     ui_elements: UiElements,
     #[serde(skip)]
     game_space: Rect,
-    #[serde(skip)]
-    api: WordApi,
 }
 
 impl Default for WordUnscramblerApp {
@@ -99,34 +94,10 @@ impl Default for WordUnscramblerApp {
             correct: String::new(),
             ui_elements: UiElements::default(),
             game_space: Rect::EVERYTHING,
-            api: WordApi::default(),
         }
     }
 }
 
-trait AsyncFunctions {
-    async fn validate(&mut self, input: String, original_word: String) -> bool;
-
-}
-
-impl AsyncFunctions for WordUnscramblerApp {
-    async fn validate(&mut self, input: String, original_word: String) -> bool{
-        let is_exact_match = input == original_word;
-        let is_valid_anagram = self.api.is_valid_word(&input).await && GameState::can_form_anagram(input, original_word);
-
-        if is_exact_match || is_valid_anagram {
-            self.game_state.correct_answer()
-                .increment_word_length()
-                .get_new_word();
-            true
-        } else {
-            self.game_state.incorrect_answer();
-            self.game_state.scrambled_word = self.game_state.restore_scrambled.clone();
-            println!("{}", &self.game_state.original_word);
-            false
-        }
-        }
-    }
 
 impl App for WordUnscramblerApp {
     /*
@@ -140,19 +111,12 @@ impl App for WordUnscramblerApp {
     The function returns immediately after displaying the game over message.
      */
     fn update(&mut self, ctx: &Context, _frame: &mut Frame) {
-        /* 
-        if self.api.buffer.len() == 0 {
-            self.api.get_next_word();
-        }
-        */
+        if self.game_state.scrambled_word.is_empty() && self.input_text.is_empty(){
+            self.game_state.get_word();
 
-        if self.game_state.scrambled_word.is_empty() && self.input_text.is_empty() && self.game_state.start{
-            if self.api.buffer.len() == 0 {
-                self.game_state.set_word(self.api.get_next_word());
-                self.game_state.start = false;
+            } else {
+                ctx.request_repaint();
             }
-        }
-        
         //let scrambled_word = &self.game_state.scrambled_word.clone();
         // Update time left
         let time_remaining = if let Some(res) = self.game_state.time_alotted.checked_sub(self.timer_start.elapsed()) {
@@ -212,7 +176,7 @@ impl App for WordUnscramblerApp {
                     }
 
             //Static UI Elements
-            ui.painter().add(ui_elements::scrambled_tray(self.game_state.word_length, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
+            ui.painter().add(ui_elements::scrambled_tray(self.game_state.api.word_length, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
             
             self.ui_elements.generate_squares(&self.game_state.scrambled_word, &self.input_text);
 
@@ -262,12 +226,12 @@ impl App for WordUnscramblerApp {
         });//End Central Panel
 
         // Request repaint
-        ctx.request_repaint_after(Duration::from_millis(100));
+        ctx.request_repaint();
     }
 }
 
 impl WordUnscramblerApp {
-   async fn submit_input(&mut self) {
+  fn submit_input(&mut self) {
         /*  
         The submit_input/1 function processes the user's input in the WordUnscramblerApp.
         It performs the following steps:
@@ -282,18 +246,31 @@ impl WordUnscramblerApp {
            - If not an exact match, checks if the input is a valid word and can form an anagram of the original word.
            - Sends the result (input and validation status) back through the channel.
         */
-       let input = self.input_text.trim().to_string();
-       if input.is_empty() {
-           return;
-       }
-       //self.validate(input, self.game_state.original_word.clone()).await;
-       let valid = self.validate(input, self.game_state.original_word.clone()).await;
-       self.guess_history.push((self.input_text.clone(), valid));
-       if valid {
-        self.game_state.set_word(self.api.get_next_word())
-       }
-    }
+      let input = self.input_text.trim().to_string();
+      self.input_text.clear();
+      
+      
+
+      if self.game_state.original_word == input {
+          self.game_state
+              .correct_answer()
+              .get_word();
+          self.guess_history.push((self.input_text.clone(), true));
+
+      } else if self.game_state.api.is_valid_word(&input) {
+          self.game_state
+              .correct_answer()
+              .get_word();
+          self.guess_history.push((self.input_text.clone(), true));
+
+      } else{ 
+          self.guess_history.push((self.input_text.clone(), false));
+          self.game_state.incorrect_answer();
+          self.game_state.scrambled_word = self.game_state.restore_scrambled.clone();
+      }
+  }
 }
+
 
 // Helper function to check if `input` can be formed from letters in `original`
 #[tokio::main]

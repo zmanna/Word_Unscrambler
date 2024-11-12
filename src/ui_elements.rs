@@ -42,9 +42,9 @@ impl GenerateAnchors for WordUnscramblerApp {
         let mut i: f32 = 1.0;
 
         // Calculate centering for scrambled letters on the screen
-        for _ in 0..self.game_state.word_length {
-            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_BUFFER 
-                         + (self.game_state.word_length / 2 - 1) as f32 * 5.0 + 2.5;
+        for _ in 0..self.game_state.api.word_length {
+            let offset = (self.game_state.api.word_length / 2) as f32 * CONTAINER_BUFFER 
+                         + (self.game_state.api.word_length / 2 - 1) as f32 * 5.0 + 2.5;
 
             // Calculate centering for letter position within tile
             self.ui_elements.scrambled_anchors.push(
@@ -65,9 +65,9 @@ impl GenerateAnchors for WordUnscramblerApp {
         let mut i: f32 = 1.0;
 
         // Calculate centering for answer letters on the screen
-        for _ in 0..self.game_state.word_length {
-            let offset = (self.game_state.word_length / 2) as f32 * CONTAINER_BUFFER 
-                         + (self.game_state.word_length / 2 - 1) as f32 * 5.0;
+        for _ in 0..self.game_state.api.word_length {
+            let offset = (self.game_state.api.word_length / 2) as f32 * CONTAINER_BUFFER 
+                         + (self.game_state.api.word_length / 2 - 1) as f32 * 5.0;
 
             // Calculate centering for letter position within tile
             self.ui_elements.answer_anchors.push(

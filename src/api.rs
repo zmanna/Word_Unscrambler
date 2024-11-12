@@ -1,30 +1,34 @@
 use rand::seq::SliceRandom; // Import SliceRandom to shuffle slices
 use reqwest::Client;
+use reqwest::Response;
 use tokio::runtime::Runtime;
-use tokio;
+use tokio::{self, sync::Notify};
+use std::sync::{Arc, Mutex};
 
 
 pub struct WordApi {
-    pub buffer: Vec<String>,
+    pub buffer: Arc<Mutex<Vec<String>>>,
     pub word_length: usize,
     pub num_words: usize,
-    pub client: Client
+    pub client: Client,
+    pub notify: Arc<Notify>,
+    pub requested: bool,
 }
 
 pub trait MakeRequest {
-    async fn fill_word_buffer(&mut self);
-    async fn is_valid_word(&self, word: &str) -> bool;
+    fn is_valid_word(&self, word: &str) -> bool;
     fn scramble_word(&self, word: &str) -> String;
-    fn get_next_word(&mut self) -> (String, String);
 }
 
 impl Default for WordApi {
     fn default() -> Self {
         Self {
-            buffer: Vec::new(),
+            buffer: Arc::new(Mutex::new(Vec::new())),
             word_length: 4,
             num_words: 4,
-            client: Client::new()
+            client: Client::new(),
+            notify: Arc::new(Notify::new()),
+            requested: false,
         }
     }
 }
@@ -41,34 +45,27 @@ if let Some(word) - words.first() {
     */
 
 impl MakeRequest for WordApi {
-    async fn fill_word_buffer(&mut self){
-        let url = format!(
-            "https://random-word-api.herokuapp.com/word?number={}&&length={}", // URL for random word API fitting length requirements
-            self.num_words,
-            self.word_length
-        );
-        let result = 
-            self.client
-                .get(url)
-                .send()
-                .await.expect("Request for words failed")
-                .text()
-                .await.expect("Failed to convert to text");
-
-        self.buffer = result.split(',').map(| word | String::from(word).chars().filter( | c | !['[', ']', '\"'].contains(c)).collect()).collect();
-    }
-
     // Function to check for validity of word referencing the dictionary API
-    async fn is_valid_word(&self, word: &str) -> bool {
-        let url = format!("https://api.dictionaryapi.dev/api/v2/entries/en/{}", word);  // URL of dictionary API
-        let response = self.client.get(url).send().await;                                          // GET request to API; get response
+    fn is_valid_word(&self, word: &str) -> bool {
+        let valid = Arc::new(Mutex::new(None));
+        let valid_arc: Arc<Mutex<Option<bool>>> = Arc::clone(&valid);
+        let url = format!("https://api.dictionaryapi.dev/api/v2/entries/en/{}", word);
+        tokio::spawn(async move{
+            let response = reqwest::get(&url).await;
 
-        // Check if response is successful and return true/false depending on that success
-        match response {
-            Ok(resp) => resp.status() == 200,
-            Err(_) => false,
+            match response{
+                Ok(resp) => *valid_arc.lock().unwrap() = Some(resp.status() == 200),
+                Err(_) => *valid_arc.lock().unwrap() =  Some(false)}          
+        });
+        while *valid.lock().unwrap() == None{};
+        let result = valid.lock().unwrap();
+        match *result{
+            Some(res) => res,
+            None => {eprint!{"Error returning validation response..."}; false},
         }
-    }
+}
+
+
 
     fn scramble_word(&self, word: &str) -> String {
         let mut chars: Vec<char> = word.chars().collect();
@@ -76,30 +73,62 @@ impl MakeRequest for WordApi {
         let scrambled_word: String = chars.into_iter().collect();
         scrambled_word
     }
+}
 
-    fn get_next_word(&mut self) -> (String, String) {
-        let buffer_clone = self.buffer.clone();
-        let word_lenth_clone = self.word_length.clone();
-        let num_words_clone = self.num_words.clone();
-        let client_clone = self.client.clone();
-        
-        if self.buffer.len() == 0 {
-            tokio::spawn(async move {
-                let mut api_clone = WordApi {
-                    buffer: buffer_clone,
-                    word_length: word_lenth_clone,
-                    num_words: num_words_clone,
-                    client: client_clone
-                };
-                api_clone.fill_word_buffer().await;
-            });
-            
-            return ("loading".into(), "loading".into())
+impl WordApi {
+    pub fn get_next_word(&mut self) -> Option<(String, String)> {
+        {
+            let mut buffer = self.buffer.lock().unwrap();
+
+            if let Some(original_word) = buffer.pop() {
+                if buffer.is_empty(){ self.word_length += 1 }; //Increment word length if last word in buffer
+                let scrambled_word = self.scramble_word(&original_word);
+                println!("Words Remaining: {}", buffer.len());
+                return Some((scrambled_word, original_word));
+            }
+        } // Release the lock before potentially spawning async task
+
+        // Buffer is empty, spawn task to fill it
+        if !self.requested{
+        let buf = Arc::clone(&self.buffer);
+        let word_length = self.word_length.clone();
+        let num_words = self.num_words.clone();
+        let client = self.client.clone();
+
+        let notify = self.notify.clone();
+        tokio::spawn(async move {
+            fill_word_buffer(num_words, word_length, client, buf).await;
+            notify.notify_one();
+        });
         }
-        let original_word = &self.buffer.pop().unwrap();
-        let scrambled_word = self.scramble_word(&original_word);
-        (scrambled_word, original_word.into())
+
+        None // Return None since we have no word to provide yet
     }
+}
+
+async fn fill_word_buffer(num_words: usize, word_length: usize, client: Client, buf: Arc<Mutex<Vec<String>>>) -> Arc<Mutex<Vec<String>>>{
+    let url = format!(
+        "https://random-word-api.herokuapp.com/word?number={}&&length={}", // URL for random word API fitting length requirements
+        num_words,
+        word_length
+    );
+    let result = client
+        .get(url)
+        .send()
+        .await
+        .expect("Request for words failed")
+        .text()
+        .await
+        .expect("Failed to convert to text");
+
+    let words = result
+        .split(',')
+        .map(| word | String::from(word).chars().filter( | c | !['[', ']', '\"'].contains(c)).collect())
+        .collect::<Vec<String>>();
+
+    for word in words{ buf.lock().unwrap().push(word) }
+    
+    return buf
 }
 
 pub fn scramble_word(word: String) -> String {
@@ -108,3 +137,4 @@ pub fn scramble_word(word: String) -> String {
     let scrambled_word: String = chars.into_iter().collect();
     scrambled_word
 }
+
