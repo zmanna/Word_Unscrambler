@@ -126,6 +126,19 @@ impl App for WordUnscramblerApp {
             Duration::ZERO //Prevent overflow by setting duration to zero if time elapsed is greater than time alotted
         };
 
+        // If game is over, display "Game Over" message
+        if self.game_over {
+            CentralPanel::default().show(ctx, |ui| {
+                ui.heading("Game Over!");
+                ui.label(format!("Final Score: {}", self.game_state.score));
+                ui.label("Thank you for playing!");
+            });
+
+            // Request repaint every 100ms to keep the UI responsive
+            ctx.request_repaint_after(Duration::from_millis(100));
+            return; // Exit update loop since the game is over
+        }
+
         // Build the UI
         TopBottomPanel::top("timer_bar").show(ctx, |ui|{ //Timer
             ui.heading(format!("Time left: {} seconds", time_remaining.as_secs()))
