@@ -3,8 +3,11 @@ use reqwest::Client;
 use reqwest::Response;
 use tokio::runtime::Runtime;
 use tokio::{self, sync::Notify};
+use core::error;
 use std::sync::{Arc, Mutex};
-
+use std::error::Error;
+use serde::{Deserialize, Serialize};
+use crate::contact_server::send_recieve::User;
 
 pub struct WordApi {
     pub buffer: Arc<Mutex<Vec<String>>>,
@@ -15,10 +18,14 @@ pub struct WordApi {
     pub requested: bool,
 }
 
-pub trait MakeRequest {
-    fn is_valid_word(&self, word: &str) -> bool;
-    fn scramble_word(&self, word: &str) -> String;
+pub struct DbAPI {
+    pub client: Client,
+    pub notify: Arc<Notify>,
+    pub requested: bool,
+    pub friends: Arc<Mutex<Vec<User>>>,
 }
+
+
 
 impl Default for WordApi {
     fn default() -> Self {
@@ -33,47 +40,6 @@ impl Default for WordApi {
     }
 }
 
-/*
-if let Some(word) - words.first() {
-    let mut chars: Vec<char> word.chars().collect();
-    chars.shuffle(&mut rand::thread_rng());
-    let scrambled_word: String = chars.into_iter().collect();
-    Some((scrambled_word, word.clone()))
-} else {
-    None
-}
-    */
-
-impl MakeRequest for WordApi {
-    // Function to check for validity of word referencing the dictionary API
-    fn is_valid_word(&self, word: &str) -> bool {
-        let valid = Arc::new(Mutex::new(None));
-        let valid_arc: Arc<Mutex<Option<bool>>> = Arc::clone(&valid);
-        let url = format!("https://api.dictionaryapi.dev/api/v2/entries/en/{}", word);
-        tokio::spawn(async move{
-            let response = reqwest::get(&url).await;
-
-            match response{
-                Ok(resp) => *valid_arc.lock().unwrap() = Some(resp.status() == 200),
-                Err(_) => *valid_arc.lock().unwrap() =  Some(false)}          
-        });
-        while *valid.lock().unwrap() == None{};
-        let result = valid.lock().unwrap();
-        match *result{
-            Some(res) => res,
-            None => {eprint!{"Error returning validation response..."}; false},
-        }
-}
-
-
-
-    fn scramble_word(&self, word: &str) -> String {
-        let mut chars: Vec<char> = word.chars().collect();
-        chars.shuffle(&mut rand::thread_rng());
-        let scrambled_word: String = chars.into_iter().collect();
-        scrambled_word
-    }
-}
 
 impl WordApi {
     pub fn get_next_word(&mut self) -> Option<(String, String)> {
@@ -103,6 +69,13 @@ impl WordApi {
         }
 
         None // Return None since we have no word to provide yet
+    }
+
+    fn scramble_word(&self, word: &str) -> String {
+        let mut chars: Vec<char> = word.chars().collect();
+        chars.shuffle(&mut rand::thread_rng());
+        let scrambled_word: String = chars.into_iter().collect();
+        scrambled_word
     }
 }
 
@@ -137,4 +110,3 @@ pub fn scramble_word(word: String) -> String {
     let scrambled_word: String = chars.into_iter().collect();
     scrambled_word
 }
-

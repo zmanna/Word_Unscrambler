@@ -40,10 +40,7 @@ Known Faults:
 
 */
 
-mod game_state;
-mod api;
-mod shape_builder;
-mod ui_elements;
+
 use tokio::{self, runtime::Runtime};
 
 use api::{ WordApi, MakeRequest};
@@ -164,6 +161,8 @@ impl App for WordUnscramblerApp {
             }
         });//End Side Panel
 
+        //SidePanel::left
+
         CentralPanel::default().show(ctx, |ui| { //Game Area
                 self.game_space = ctx.available_rect();               
                 self.scrambled_letter_anchors();
@@ -257,7 +256,7 @@ impl WordUnscramblerApp {
               .get_word();
           self.guess_history.push((self.input_text.clone(), true));
 
-      } else if self.game_state.api.is_valid_word(&input) {
+      } else if self.game_state.validate_word(&input) {
           self.game_state
               .correct_answer()
               .get_word();
