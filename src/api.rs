@@ -4,10 +4,14 @@ use reqwest::Response;
 use tokio::runtime::Runtime;
 use tokio::{self, sync::Notify};
 use core::error;
+use std::default;
 use std::sync::{Arc, Mutex};
 use std::error::Error;
 use serde::{Deserialize, Serialize};
+use crate::contact_server::send_recieve::MakeRequest;
 use crate::contact_server::send_recieve::User;
+use crate::contact_server::send_recieve::ReturnType;
+
 
 pub struct WordApi {
     pub buffer: Arc<Mutex<Vec<String>>>,
@@ -18,24 +22,45 @@ pub struct WordApi {
     pub requested: bool,
 }
 
+impl default::Default for WordApi {
+    fn default() -> Self {
+        Self {
+            buffer: Arc::new(Mutex::new(Vec::new())),
+            word_length: 5,
+            num_words: 10,
+            client: Client::new(),
+            notify: Arc::new(Notify::new()),
+            requested: false,
+        }
+    }
+}
+
 pub struct DbAPI {
     pub client: Client,
     pub notify: Arc<Notify>,
     pub requested: bool,
     pub friends: Arc<Mutex<Vec<User>>>,
+    pub users: Arc<Mutex<Vec<User>>>,
 }
 
+impl DbAPI {
+    async fn getAllUsers(&mut self){
+        if (!self.requested && self.users.lock().unwrap().is_empty()){
+            let result = self.send_request("/api/User/GetAllUsers");
+            self.requested = true;
 
-
-impl Default for WordApi {
-    fn default() -> Self {
-        Self {
-            buffer: Arc::new(Mutex::new(Vec::new())),
-            word_length: 4,
-            num_words: 4,
-            client: Client::new(),
-            notify: Arc::new(Notify::new()),
-            requested: false,
+            match result {
+                ReturnType::Users(us) => {
+                    self.users.lock().unwrap().extend(us);
+                },
+                ReturnType::IsValid(is_valid) => {
+                    // handle is_valid case
+                    println!("{}", is_valid);
+                },
+                _ => {
+                    // handle other cases
+                }
+            }
         }
     }
 }

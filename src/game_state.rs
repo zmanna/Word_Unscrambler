@@ -1,5 +1,5 @@
 use std::time::Duration;
-use api::WordApi;
+use crate::api::WordApi;
 use crate::contact_server::send_recieve::{MakeRequest, ReturnType};
 
 // Structure to represent the game state with serialize and deserialize to convert to JSON to be stored for later
@@ -25,7 +25,7 @@ impl GameState {
             api: WordApi::default(),
         }
     }
-    fn validate_word(&self, input: &str) -> bool {
+    pub fn validate_word(&self, input: &str) -> bool {
         match self.api.send_request(input){
             ReturnType::IsValid(valid) => valid,
             _ =>{eprint!("Error validating word..."); false}

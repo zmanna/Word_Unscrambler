@@ -14,10 +14,10 @@ pub mod send_recieve
         Error(Option<String>),
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, Debug)]
     pub struct User{
-        username: String,
-        score: u32,
+        pub username: String,
+        pub score: u32,
     }
 
     impl MakeRequest for WordApi {
@@ -46,14 +46,14 @@ pub mod send_recieve
         fn send_request(&self, input: &str) -> ReturnType{
             let url = format!("word-unscrambler-api-ade3e9ard4huhmbh.canadacentral-01.azurewebsites.net{}", input);
             let response_arc: Arc<Mutex<Vec<User>>> = Arc::clone(&self.friends);
-            
+
             tokio::spawn(async move{
                 let response = reqwest::get(&url).await;
 
                 match response{
-                    Ok(resp) => *response_arc.lock().unwrap() = {
-                        let response_body: User = resp.json().await.unwrap();
-                        self.friends = response_body;
+                    Ok(resp) => {
+                        let response_body: Vec<User> = resp.json().await.unwrap();
+                        *response_arc.lock().unwrap() = response_body;
                     },
                     Err(e) => eprint!("{}", e)}          
             });

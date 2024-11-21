@@ -15,3 +15,4 @@ regex = "1"
 queues = "1.1.0"
 reqwest = {version = "0.12.9", features =  ["blocking", "json", "native-tls"]}
 tokio = {version = "1.41.1", features = ["full"]}
+egui = "0.15"

@@ -1,4 +1,4 @@
-use crate::{shape_builder::{self, TextAttributes}, WordUnscramblerApp};
+use crate::shape_builder::{self, TextAttributes};
 use shape_builder::{ShapeAttributes, Dimensions, RoundingType};
 use eframe::{egui::{Color32, Shape, Stroke}, epaint::{Fonts, RectShape, TextShape}};
 use emath::{Pos2, Rect, Vec2};
@@ -8,6 +8,8 @@ use std::ops::Mul;
 // Constants for width and spcaing of letter tiles
 static CONTAINER_WIDTH: f32 = 50.0;
 static CONTAINER_BUFFER: f32 = CONTAINER_WIDTH + 5.0;
+
+
 
 #[derive(Default)]
 
@@ -33,53 +35,7 @@ pub trait GenerateUiShapes{
 }
 
 // Implementation for generating anchors within Word scrambler app
-impl GenerateAnchors for WordUnscramblerApp {
 
-    // Function to calculate anchors for scrambled letter tiles
-    fn scrambled_letter_anchors(&mut self) -> &mut Self {
-        // Clear existing anchors and recalculate based on word length
-        self.ui_elements.scrambled_anchors.clear();
-        let mut i: f32 = 1.0;
-
-        // Calculate centering for scrambled letters on the screen
-        for _ in 0..self.game_state.api.word_length {
-            let offset = (self.game_state.api.word_length / 2) as f32 * CONTAINER_BUFFER 
-                         + (self.game_state.api.word_length / 2 - 1) as f32 * 5.0 + 2.5;
-
-            // Calculate centering for letter position within tile
-            self.ui_elements.scrambled_anchors.push(
-                self.game_space.center() 
-                - Vec2::from((offset, 0.0)) 
-                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 0.0))
-            );
-            i += 1.0;
-        }
-        self
-    }
-
-    // Function to calculate anchors for answer letter tiles
-    fn answer_letter_anchors(&mut self) -> &mut Self {
-
-        // Clear existing anchors and recalculate based on word length
-        self.ui_elements.answer_anchors.clear();
-        let mut i: f32 = 1.0;
-
-        // Calculate centering for answer letters on the screen
-        for _ in 0..self.game_state.api.word_length {
-            let offset = (self.game_state.api.word_length / 2) as f32 * CONTAINER_BUFFER 
-                         + (self.game_state.api.word_length / 2 - 1) as f32 * 5.0;
-
-            // Calculate centering for letter position within tile
-            self.ui_elements.answer_anchors.push(
-                self.game_space.center_bottom() 
-                - Vec2::from((offset, 0.0)) 
-                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 95.0))
-            );
-            i += 1.0;
-        }
-        self
-    }
-}
 
 // Implementation for generating UI shapes for UI Elements struct
 impl GenerateUiShapes for UiElements {

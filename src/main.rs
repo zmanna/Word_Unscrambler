@@ -42,40 +42,47 @@ Known Faults:
 
 
 use tokio::{self, runtime::Runtime};
-
-use api::{ WordApi, MakeRequest};
+use std::sync::{Arc, Mutex};
+use world_scrambler::api::{WordApi, DbAPI};
+use world_scrambler::contact_server::send_recieve::{self, MakeRequest, ReturnType};
+use world_scrambler::game_state;
 use eframe::egui::{Event, FontFamily, FontId, FontSelection};
 use eframe::{App, Frame};
 use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
 use emath::Align2;
-use shape_builder::{ShapeAttributes, RoundingType, Dimensions};
-use ui_elements::{guess_boxes, letter_square, GenerateAnchors, GenerateUiShapes, UiElements};
+use world_scrambler::shape_builder::{ShapeAttributes, RoundingType, Dimensions};
+use world_scrambler::ui_elements::{guess_boxes, letter_square, GenerateAnchors ,GenerateUiShapes, UiElements};
+use world_scrambler::contact_server;
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
-use crate::game_state::UpdateGameVariables;
+use world_scrambler::game_state::UpdateGameVariables;
 use regex::Regex;
+
+static CONTAINER_WIDTH: f32 = 50.0;
+static CONTAINER_BUFFER: f32 = CONTAINER_WIDTH + 5.0;
 
 #[derive(Deserialize, Serialize)]
 #[serde(default)]
 pub struct WordUnscramblerApp {
     #[serde(skip)]
-    game_state: game_state::GameState,
-    guess_history: Vec<(String, bool)>,
-    input_text: String,
+    pub game_state: game_state::GameState,
+    pub guess_history: Vec<(String, bool)>,
+    pub input_text: String,
     #[serde(skip)]
-    timer_start: Instant,
+    pub timer_start: Instant,
     #[serde(skip)]
-    validation_receiver: Option<Receiver<(String, bool)>>,
+    pub validation_receiver: Option<Receiver<(String, bool)>>,
     #[serde(skip)]
-    scrambled_word_receiver: Option<Receiver<(String, String)>>,
-    game_over: bool,
-    correct: String,
+    pub scrambled_word_receiver: Option<Receiver<(String, String)>>,
+    pub game_over: bool,
+    pub correct: String,
     #[serde(skip)]
-    ui_elements: UiElements,
+    pub ui_elements: UiElements,
     #[serde(skip)]
-    game_space: Rect,
+    pub game_space: Rect,
 }
+
 
 impl Default for WordUnscramblerApp {
     fn default() -> Self {
@@ -95,6 +102,53 @@ impl Default for WordUnscramblerApp {
     }
 }
 
+impl GenerateAnchors for WordUnscramblerApp {
+
+    // Function to calculate anchors for scrambled letter tiles
+    fn scrambled_letter_anchors(&mut self) -> &mut Self {
+        // Clear existing anchors and recalculate based on word length
+        self.ui_elements.scrambled_anchors.clear();
+        let mut i: f32 = 1.0;
+
+        // Calculate centering for scrambled letters on the screen
+        for _ in 0..self.game_state.api.word_length {
+            let offset = (self.game_state.api.word_length / 2) as f32 * CONTAINER_BUFFER 
+                         + (self.game_state.api.word_length / 2 - 1) as f32 * 5.0 + 2.5;
+
+            // Calculate centering for letter position within tile
+            self.ui_elements.scrambled_anchors.push(
+                self.game_space.center() 
+                - Vec2::from((offset, 0.0)) 
+                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 0.0))
+            );
+            i += 1.0;
+        }
+        self
+    }
+
+    // Function to calculate anchors for answer letter tiles
+    fn answer_letter_anchors(&mut self) -> &mut Self {
+
+        // Clear existing anchors and recalculate based on word length
+        self.ui_elements.answer_anchors.clear();
+        let mut i: f32 = 1.0;
+
+        // Calculate centering for answer letters on the screen
+        for _ in 0..self.game_state.api.word_length {
+            let offset = (self.game_state.api.word_length / 2) as f32 * CONTAINER_BUFFER 
+                         + (self.game_state.api.word_length / 2 - 1) as f32 * 5.0;
+
+            // Calculate centering for letter position within tile
+            self.ui_elements.answer_anchors.push(
+                self.game_space.center_bottom() 
+                - Vec2::from((offset, 0.0)) 
+                - Vec2::from((CONTAINER_BUFFER - (i * CONTAINER_BUFFER), 95.0))
+            );
+            i += 1.0;
+        }
+        self
+    }
+}
 
 impl App for WordUnscramblerApp {
     /*
@@ -161,7 +215,33 @@ impl App for WordUnscramblerApp {
             }
         });//End Side Panel
 
-        //SidePanel::left
+        SidePanel::left("Friends").show(ctx, |ui|{ //Friends List
+            ui.heading("Friends List");
+            ui.separator();
+            ui.label("Friends:");
+            ui.separator();
+            ui.label("Friend Requests:");
+
+            // Create new instance of DbAPI
+            let db_api = DbAPI{
+                client: reqwest::Client::new(),
+                notify: Arc::new(tokio::sync::Notify::new()),
+                requested: false,
+                friends: Arc::new(Mutex::new(Vec::new())),
+                users: Arc::new(Mutex::new(Vec::new()))
+            };
+
+            let users_lock = db_api.users.lock().unwrap();
+
+            let users_list: String = users_lock
+                .iter()
+                .map(|user| format!("{:?}", user)) // Assuming the User struct implements Debug trait
+                .collect::<Vec<_>>()
+                .join(", ");
+
+            ui.label(format!("{}", users_list));
+
+        });//End Side Panel
 
         CentralPanel::default().show(ctx, |ui| { //Game Area
                 self.game_space = ctx.available_rect();               
@@ -175,7 +255,7 @@ impl App for WordUnscramblerApp {
                     }
 
             //Static UI Elements
-            ui.painter().add(ui_elements::scrambled_tray(self.game_state.api.word_length, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
+            ui.painter().add(world_scrambler::ui_elements::scrambled_tray(self.game_state.api.word_length, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
             
             self.ui_elements.generate_squares(&self.game_state.scrambled_word, &self.input_text);
 
