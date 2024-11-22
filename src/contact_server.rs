@@ -16,8 +16,10 @@ pub mod send_recieve
 
     #[derive(Deserialize, Debug)]
     pub struct User{
-        pub username: String,
-        pub score: u32,
+        pub UserID: i32,
+        pub Username: String,
+        pub Password: String,
+        pub HighScore: i32,
     }
 
     impl MakeRequest for WordApi {
@@ -44,12 +46,11 @@ pub mod send_recieve
 
     impl MakeRequest for DbAPI{
         fn send_request(&self, input: &str) -> ReturnType{
-            let url = format!("word-unscrambler-api-ade3e9ard4huhmbh.canadacentral-01.azurewebsites.net{}", input);
-            let response_arc: Arc<Mutex<Vec<User>>> = Arc::clone(&self.friends);
+            let url = format!("http://word-unscrambler-api-ade3e9ard4huhmbh.canadacentral-01.azurewebsites.net{}", input);
+            let response_arc: Arc<Mutex<Vec<User>>> = Arc::clone(&self.users);
 
             tokio::spawn(async move{
                 let response = reqwest::get(&url).await;
-
                 match response{
                     Ok(resp) => {
                         let response_body: Vec<User> = resp.json().await.unwrap();

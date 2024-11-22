@@ -38,31 +38,26 @@ impl default::Default for WordApi {
 pub struct DbAPI {
     pub client: Client,
     pub notify: Arc<Notify>,
-    pub requested: bool,
     pub friends: Arc<Mutex<Vec<User>>>,
     pub users: Arc<Mutex<Vec<User>>>,
 }
 
-impl DbAPI {
-    async fn getAllUsers(&mut self){
-        if (!self.requested && self.users.lock().unwrap().is_empty()){
-            let result = self.send_request("/api/User/GetAllUsers");
-            self.requested = true;
 
-            match result {
-                ReturnType::Users(us) => {
-                    self.users.lock().unwrap().extend(us);
-                },
-                ReturnType::IsValid(is_valid) => {
-                    // handle is_valid case
-                    println!("{}", is_valid);
-                },
-                _ => {
-                    // handle other cases
-                }
-            }
-        }
+impl DbAPI {
+
+    pub fn new() -> Self{
+        let api = DbAPI {
+            client: Client::new(),
+            notify: Arc::new(Notify::new()),
+            friends: Arc::new(Mutex::new(Vec::new())),
+            users: {Arc::new(Mutex::new(Vec::new()))}
+        };
+        api.send_request("/api/User/GetAllUsers");
+
+        api
     }
+
+
 }
 
 

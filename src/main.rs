@@ -81,6 +81,8 @@ pub struct WordUnscramblerApp {
     pub ui_elements: UiElements,
     #[serde(skip)]
     pub game_space: Rect,
+    #[serde(skip)]
+    pub user_data_base: DbAPI,
 }
 
 
@@ -98,6 +100,7 @@ impl Default for WordUnscramblerApp {
             correct: String::new(),
             ui_elements: UiElements::default(),
             game_space: Rect::EVERYTHING,
+            user_data_base: DbAPI::new(),
         }
     }
 }
@@ -218,28 +221,24 @@ impl App for WordUnscramblerApp {
         SidePanel::left("Friends").show(ctx, |ui|{ //Friends List
             ui.heading("Friends List");
             ui.separator();
-            ui.label("Friends:");
-            ui.separator();
-            ui.label("Friend Requests:");
+            ui.label("Users:");
 
             // Create new instance of DbAPI
-            let db_api = DbAPI{
-                client: reqwest::Client::new(),
-                notify: Arc::new(tokio::sync::Notify::new()),
-                requested: false,
-                friends: Arc::new(Mutex::new(Vec::new())),
-                users: Arc::new(Mutex::new(Vec::new()))
-            };
+            let mut current_users: String = "Current Players: f".to_owned();
+            let user_list = self.user_data_base.users.lock().unwrap();
+            while !self.user_data_base.users.lock().unwrap().is_empty(){
+                let user_option = self.user_data_base.users.lock().unwrap().pop();
+                match user_option{
+                    Some(user) => {current_users = format!(
+                        "User ID: {}  \n
+                        User Name: {} \n
+                        Password: {} \n
+                        High Score: {} \n", user.UserID, user.Username, user.Password, user.HighScore)},
+                    None => println!("No User Data")
+                }
+            }
 
-            let users_lock = db_api.users.lock().unwrap();
-
-            let users_list: String = users_lock
-                .iter()
-                .map(|user| format!("{:?}", user)) // Assuming the User struct implements Debug trait
-                .collect::<Vec<_>>()
-                .join(", ");
-
-            ui.label(format!("{}", users_list));
+            ui.label("{current_users}");
 
         });//End Side Panel
 

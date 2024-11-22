@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("RustGameAPI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+0e9668866835f909158bda1fbbacbc35000d1edb")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+520c9038b56debc2facd90c0130a1b25b938b2ca")]
 [assembly: System.Reflection.AssemblyProductAttribute("RustGameAPI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("RustGameAPI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
