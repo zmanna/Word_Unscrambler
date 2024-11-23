@@ -15,6 +15,7 @@ pub mod send_recieve
     }
 
     #[derive(Deserialize, Debug)]
+    #[derive(Clone)]
     pub struct User{
         pub UserID: i32,
         pub Username: String,

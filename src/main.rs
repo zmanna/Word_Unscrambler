@@ -225,20 +225,17 @@ impl App for WordUnscramblerApp {
 
             // Create new instance of DbAPI
             let mut current_users: String = "Current Players: f".to_owned();
-            let user_list = self.user_data_base.users.lock().unwrap();
-            while !self.user_data_base.users.lock().unwrap().is_empty(){
-                let user_option = self.user_data_base.users.lock().unwrap().pop();
-                match user_option{
-                    Some(user) => {current_users = format!(
+            let user_list = self.user_data_base.users.lock().unwrap().clone();
+            for user in user_list {
+                    let entry: &str = &format!(
                         "User ID: {}  \n
                         User Name: {} \n
                         Password: {} \n
-                        High Score: {} \n", user.UserID, user.Username, user.Password, user.HighScore)},
-                    None => println!("No User Data")
-                }
+                        High Score: {} \n", &user.UserID, &user.Username, &user.Password, &user.HighScore);
+                current_users.push_str(entry)
             }
 
-            ui.label("{current_users}");
+            ui.label(current_users);
 
         });//End Side Panel
 
