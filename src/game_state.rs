@@ -25,10 +25,32 @@ impl GameState {
             api: WordApi::default(),
         }
     }
+    
+    fn uses_all_letters(&self, input: &str) -> bool {
+        let mut input_chars: Vec<char> = input.chars().collect();
+        let mut original_chars: Vec<char> = self.original_word.chars().collect();
+    
+        // Sort both lists of characters
+        input_chars.sort_unstable();
+        original_chars.sort_unstable();
+    
+        // Compare sorted characters
+        input_chars == original_chars
+    }    
+
     pub fn validate_word(&self, input: &str) -> bool {
-        match self.api.send_request(input){
+        // Check if the input uses all letters from the original word
+        if !self.uses_all_letters(input) {
+            return false;
+        }
+
+        // Check if the input is a valid dictionary word using the API
+        match self.api.send_request(input) {
             ReturnType::IsValid(valid) => valid,
-            _ =>{eprint!("Error validating word..."); false}
+            _ => {
+                eprintln!("Error validating word...");
+                false
+            }
         }
     }
 }
