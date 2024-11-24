@@ -22,6 +22,7 @@ Creation Date: 10/25/2024F
 Dates revised:
 - 10/27/2024: Build UI (Paul Dykes) and refactor code to fit UI (John Mosley, Spencer Addis, Aryamann Zutshi, Willem Battey)
 -11/10/2024: Refactor code and elaborate on the UI (Spencer, John, Paul) and build SQL database (Willem) and implemnent tokio (John, Paul, Aryamann)
+-11/23/2024: Adding in rodio dependency and implementing struct Sounds we have created
 
 Preconditions:
 - User-inputted words: unscramble the presented word (String)
@@ -41,6 +42,7 @@ Known Faults:
 */
 
 
+use eframe::epaint::text::cursor::Cursor;
 use tokio::{self, runtime::Runtime};
 use std::sync::{Arc, Mutex};
 use world_scrambler::api::{WordApi, DbAPI};
@@ -58,6 +60,8 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use world_scrambler::game_state::UpdateGameVariables;
 use regex::Regex;
+use rodio::{OutputStream, OutputStreamHandle, Sink, Source};
+use rodio::source::SineWave;
 
 static CONTAINER_WIDTH: f32 = 50.0;
 static CONTAINER_BUFFER: f32 = CONTAINER_WIDTH + 5.0;
@@ -83,11 +87,65 @@ pub struct WordUnscramblerApp {
     pub game_space: Rect,
     #[serde(skip)]
     pub user_data_base: DbAPI,
+    #[serde(skip)]
+    pub sounds: Sounds,
+    #[serde(skip)]
+    pub warning_played: bool, //we want to not have multiple warnings occur incase they improve from ten seconds left and then hit ten seconds again, warning is one time
+}
+
+pub struct Sounds {
+    correct: Sink,
+    incorrect: Sink,
+    warning: Sink,
+    game_over: Sink,
+}
+
+impl Sounds {
+    pub fn new(stream: &OutputStreamHandle) -> Self {
+        // Create sinks for each sound effect
+        let correct = Sink::try_new(stream).unwrap();
+        let incorrect = Sink::try_new(stream).unwrap();
+        let warning = Sink::try_new(stream).unwrap();
+        let game_over = Sink::try_new(stream).unwrap();
+
+        // Generate tones for each sound effect
+        let correct_tone = SineWave::new(880.0).take_duration(Duration::from_millis(500)); // High-pitched tone
+        let incorrect_tone = SineWave::new(220.0).take_duration(Duration::from_millis(500)); // Low-pitched tone
+        let warning_tone = SineWave::new(440.0).take_duration(Duration::from_millis(1000)); // Mid-pitched tone
+        let game_over_tone = SineWave::new(330.0).take_duration(Duration::from_secs(2)); // Longer tone
+
+        // Attach tones to sinks
+        correct.append(correct_tone);
+        incorrect.append(incorrect_tone);
+        warning.append(warning_tone);
+        game_over.append(game_over_tone);
+
+        Self {
+            correct,
+            incorrect,
+            warning,
+            game_over,
+        }
+    }
+
+    // Play a sound effect
+    pub fn play(&self, sound_type: &str) {
+        match sound_type {
+            "correct" => self.correct.play(),
+            "incorrect" => self.incorrect.play(),
+            "warning" => self.warning.play(),
+            "game_over" => self.game_over.play(),
+            _ => {}
+        }
+    }
 }
 
 
 impl Default for WordUnscramblerApp {
     fn default() -> Self {
+        let (_stream, stream_handle) = rodio::OutputStream::try_default().unwrap();
+        let sounds = Sounds::new(&stream_handle); //had to change from _stream to stream_handle to work with OutputStreamHandle
+
         Self {
             //Instantiate default game values
             game_state: game_state::GameState::new(),
@@ -101,6 +159,8 @@ impl Default for WordUnscramblerApp {
             ui_elements: UiElements::default(),
             game_space: Rect::EVERYTHING,
             user_data_base: DbAPI::new(),
+            sounds,
+            warning_played: false,
         }
     }
 }
@@ -322,24 +382,27 @@ impl WordUnscramblerApp {
            - Sends the result (input and validation status) back through the channel.
         */
       let input = self.input_text.trim().to_string();
-      self.input_text.clear();
+      self.input_text.clear(); //clearing after extracting value
       
       
 
       if self.game_state.original_word == input {
+          self.sounds.play("correct"); //adding in sound 11/23/24
           self.game_state
               .correct_answer()
               .get_word();
-          self.guess_history.push((self.input_text.clone(), true));
+          self.guess_history.push((input.clone(), true));
 
       } else if self.game_state.validate_word(&input) {
+          self.sounds.play("correct");
           self.game_state
               .correct_answer()
               .get_word();
-          self.guess_history.push((self.input_text.clone(), true));
+          self.guess_history.push((input.clone(), true));
 
       } else{ 
-          self.guess_history.push((self.input_text.clone(), false));
+          self.sounds.play("incorrect");
+          self.guess_history.push((input.clone(), false));
           self.game_state.incorrect_answer();
           self.game_state.scrambled_word = self.game_state.restore_scrambled.clone();
       }
