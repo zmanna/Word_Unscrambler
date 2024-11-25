@@ -80,6 +80,7 @@ pub struct WordUnscramblerApp {
     #[serde(skip)]
     pub scrambled_word_receiver: Option<Receiver<(String, String)>>,
     pub game_over: bool,
+    pub game_over_logged: bool,
     pub correct: String,
     #[serde(skip)]
     pub ui_elements: UiElements,
@@ -155,6 +156,7 @@ impl Default for WordUnscramblerApp {
             validation_receiver: None,
             scrambled_word_receiver: None,
             game_over: false,
+            game_over_logged: false,
             correct: String::new(),
             ui_elements: UiElements::default(),
             game_space: Rect::EVERYTHING,
@@ -243,14 +245,19 @@ impl App for WordUnscramblerApp {
 
         if self.game_over {
             
-            let guesses = self.guess_history.len();
-            let correct = self.guess_history.iter().filter(|&n| n.1 == true).count();
-            print!("Score: {}", self.game_state.score);
-            print!("Ratio: {}", correct/guesses);
+            let guesses = self.guess_history.len() as f32;
+            let correct = self.guess_history.iter().filter(|&n| n.1 == true).count() as f32;
+            let ratio = if guesses == 0.0 {0.0} else {correct / guesses};
+            if !self.game_over_logged {
+                print!("Score: {}", self.game_state.score);
+                print!("Ratio: {:.2}", ratio);
+                self.game_over_logged = true;
+            }
 
             CentralPanel::default().show(ctx, |ui| {
                 ui.heading("Game Over!");
                 ui.label(format!("Final Score: {}", self.game_state.score));
+                ui.label(format!("Correct/Incorrect Ratio: {:.2}", ratio));
                 ui.label("Thank you for playing!");
             });
     
