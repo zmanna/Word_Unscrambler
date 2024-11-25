@@ -242,6 +242,12 @@ impl App for WordUnscramblerApp {
         };
 
         if self.game_over {
+            
+            let guesses = self.guess_history.len();
+            let correct = self.guess_history.iter().filter(|&n| n.1 == true).count();
+            print!("Score: {}", self.game_state.score);
+            print!("Ratio: {}", correct/guesses);
+
             CentralPanel::default().show(ctx, |ui| {
                 ui.heading("Game Over!");
                 ui.label(format!("Final Score: {}", self.game_state.score));
@@ -304,12 +310,6 @@ impl App for WordUnscramblerApp {
                 self.scrambled_letter_anchors();
                 self.answer_letter_anchors(); 
 
-            if ui.input(|i| i.key_pressed(Key::Enter)) { // If Enter key is pressed
-                        //println!("first one: {}", self.input_text);
-                        //self.submit_input(); // Submit the input
-                        //self.input_text.clear();
-                    }
-
             //Static UI Elements
             ui.painter().add(world_scrambler::ui_elements::scrambled_tray(self.game_state.api.word_length, ui.ctx().available_rect().center_bottom() - Vec2::from((0.0, 100.0))));
             
@@ -367,24 +367,8 @@ impl App for WordUnscramblerApp {
 
 impl WordUnscramblerApp {
   fn submit_input(&mut self) {
-        /*  
-        The submit_input/1 function processes the user's input in the WordUnscramblerApp.
-        It performs the following steps:
-        1. Trims and converts the input text to a string.
-        2. If the input is empty, it returns immediately.
-        3. Clears the input text.
-        4. Clones the original word from the game state.
-        5. Creates a new channel for validation.
-        6. Sets the validation receiver to the newly created receiver.
-        7. Spawns a background thread to validate the input:
-           - Checks if the input is an exact match with the original word.
-           - If not an exact match, checks if the input is a valid word and can form an anagram of the original word.
-           - Sends the result (input and validation status) back through the channel.
-        */
       let input = self.input_text.trim().to_string();
-      self.input_text.clear(); //clearing after extracting value
-      
-      
+      self.input_text.clear();      
 
       if self.game_state.original_word == input {
           self.sounds.play("correct"); //adding in sound 11/23/24
@@ -413,39 +397,13 @@ impl WordUnscramblerApp {
 // Helper function to check if `input` can be formed from letters in `original`
 #[tokio::main]
 async fn main() {
-    //env::set_var("RUST_BACKTRACE", "1");
-    let native_options = eframe::NativeOptions::default(); // Create default native options
-    let _ = eframe::run_native( // Run the native app
+    let native_options = eframe::NativeOptions::default(); 
+    let _ = eframe::run_native(
         "Word Unscrambler", // Set the app title
-        native_options, // Set the native options
+        native_options, 
         Box::new(|_cc| Ok(Box::new(WordUnscramblerApp::default()))), // Create a new WordUnscramblerApp instance
     );
 }
 
 
 
-/*
-            if self.game_over{
-                ui.heading("Game Over!");
-                ui.label(format!("Final Score: {}", self.game_state.score));
-                ctx.request_repaint();
-                return;
-            }
-            else{
-                ui.heading(format!("Scrambled Word: {}", scrambled_word)); // Display scrambled word
-
-                ui.horizontal(|ui| { // Create a horizontal layout
-                    ui.label("Your guess: "); // Display label
-                    let response = ui.text_edit_singleline(&mut self.input_text); // Display text input
-                    response.request_focus(); // Request focus for text input
-                    
-                });
-
-                if ui.button("Submit").clicked() { // If the submit button is clicked
-                    self.submit_input(); // Submit the input
-                }
-                
-                ui.heading(format!("{}", self.correct)); // Display correct/incorrect message
-                
-            }
-*/
