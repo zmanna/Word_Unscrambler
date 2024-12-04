@@ -1,11 +1,10 @@
-
 pub mod send_recieve
 {
     use std::sync::{Arc, Mutex};
     use crate::api::{WordApi, DbAPI};
     use serde::Deserialize;
     pub trait MakeRequest {
-        fn send_request(&self, input: &str) -> ReturnType;    
+        fn send_request(&self, input: &str) -> ReturnType;
     }
 
     pub enum ReturnType{
