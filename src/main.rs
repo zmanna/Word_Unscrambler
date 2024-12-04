@@ -50,7 +50,7 @@ use world_scrambler::contact_server::send_recieve::{self, MakeRequest, ReturnTyp
 use world_scrambler::game_state;
 use eframe::egui::{Event, FontFamily, FontId, FontSelection};
 use eframe::{App, Frame};
-use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2};
+use eframe::egui::{self, CentralPanel, Color32, Context, text::Fonts, FontDefinitions, Key, Painter, Pos2, Rect, Rounding, Shape, SidePanel, Stroke, TopBottomPanel, Vec2, Button};
 use emath::Align2;
 use world_scrambler::shape_builder::{ShapeAttributes, RoundingType, Dimensions};
 use world_scrambler::ui_elements::{guess_boxes, letter_square, GenerateAnchors ,GenerateUiShapes, UiElements};
@@ -245,7 +245,13 @@ impl App for WordUnscramblerApp {
             CentralPanel::default().show(ctx, |ui| {
                 ui.heading("Game Over!");
                 ui.label(format!("Final Score: {}", self.game_state.score));
-                ui.label("Thank you for playing!");
+                //let share_button = ui.add(Button::new("Share your score"));
+                //if share_button.clicked() {
+
+                //}
+                let url = format!("https://twitter.com/intent/tweet?text=I+just+got+a+score+of+{}+in+word+unscrambler", self.game_state.score);
+                ui.hyperlink(url);
+
             });
     
             // Request repaint every 100ms to keep the UI responsive
