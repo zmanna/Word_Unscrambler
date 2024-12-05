@@ -132,6 +132,13 @@ impl App for WordUnscramblerApp {
                 ui.heading("Game Over!");
                 ui.label(format!("Final Score: {}", self.game_state.score));
                 ui.label("Thank you for playing!");
+                let url = format!("https://twitter.com/intent/tweet?text=I+just+got+a+score+of+{}+in+word+unscrambler", self.game_state.score);
+
+                ui.horizontal(|ui| {
+                    ui.label("Share your score");
+                    ui.add_space(10.0);
+                    ui.hyperlink(url);
+                });
             });
 
             // Request repaint every 100ms to keep the UI responsive

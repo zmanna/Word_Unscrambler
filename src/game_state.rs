@@ -1,7 +1,8 @@
 use std::time::Duration;             // Timer 
 use serde::{Serialize, Deserialize}; // Used to convert to JSON for saving game
 use std::sync::mpsc::Receiver;
-
+use std::fs::File;
+use std::io::{BufWriter, Write};
 use crate::api;                      // Use dictionary API
 
 // Structure to represent the game state with serialize and deserialize to convert to JSON to be stored for later
