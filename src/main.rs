@@ -92,6 +92,7 @@ pub struct WordUnscramblerApp {
     pub sounds: Sounds,
     #[serde(skip)]
     pub warning_played: bool, //we want to not have multiple warnings occur incase they improve from ten seconds left and then hit ten seconds again, warning is one time
+    pub hint: Option<String>,
 }
 
 pub struct Sounds {
@@ -163,6 +164,7 @@ impl Default for WordUnscramblerApp {
             user_data_base: DbAPI::new(),
             sounds,
             warning_played: false,
+            hint: None,
         }
     }
 }
@@ -271,9 +273,47 @@ impl App for WordUnscramblerApp {
         }
 
         // Build the UI
-        TopBottomPanel::top("timer_bar").show(ctx, |ui|{ //Timer
-            ui.heading(format!("Time left: {} seconds", time_remaining.as_secs()))
-        });//End Side Panel
+        TopBottomPanel::top("timer_and_hint").show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(
+                    egui::RichText::new(format!("Time left: {} seconds", time_remaining.as_secs()))
+                        .font(egui::FontId::new(20.0, FontFamily::Proportional)),
+                );
+
+                if ui.add(egui::Button::new(
+                    egui::RichText::new("Hint")
+                        .font(egui::FontId::new(20.0, FontFamily::Proportional)),
+                )).clicked()
+                {
+                    // Generate a hint if it doesn't already exist
+                    if self.hint.is_none() && !self.game_state.original_word.is_empty() {
+                        let hint = self.game_state.original_word.chars().next().unwrap();
+                        self.hint = Some(format!("Hint: Starts with '{}'", hint));
+
+                        if self.game_state.score >= 5 {
+                            self.game_state.score -= 5;
+                        } else {
+                            self.game_state.score = 0; // Prevent score from going negative
+                        }
+                    }
+                }
+
+                // Display the hint if it exists
+                if let Some(hint) = &self.hint {
+                    ui.label(
+                        egui::RichText::new(hint)
+                            .font(egui::FontId::new(20.0, FontFamily::Proportional))
+                            .color(Color32::YELLOW),
+                    );
+                }
+            });
+        });
+
+        // Clear the hint when the word is solved
+        if self.game_state.original_word.is_empty() {
+            self.hint = None;
+        }
+        
         
         SidePanel::right("score_and_history").show(ctx, |ui|{ //Score and Guess History
             ui.heading(format!("Score: {}", self.game_state.score));
@@ -363,6 +403,7 @@ impl WordUnscramblerApp {
               .correct_answer()
               .get_word();
           self.guess_history.push((input.clone(), true));
+          self.hint = None;
 
       } else if self.game_state.validate_word(&input) {
           self.sounds.play("correct");
@@ -370,6 +411,7 @@ impl WordUnscramblerApp {
               .correct_answer()
               .get_word();
           self.guess_history.push((input.clone(), true));
+          self.hint = None;
 
       } else{ 
           self.sounds.play("incorrect");
