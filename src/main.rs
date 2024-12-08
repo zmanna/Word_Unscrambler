@@ -261,8 +261,8 @@ impl App for WordUnscramblerApp {
                 //if share_button.clicked() {
 
                 //}
-                let url = format!("https://twitter.com/intent/tweet?text=I+just+got+a+score+of+{}+in+word+unscrambler", self.game_state.score);
-                ui.hyperlink(url);
+                //let url = format!("https://twitter.com/intent/tweet?text=I+just+got+a+score+of+{}+in+word+unscrambler", self.game_state.score);
+                //ui.hyperlink(url);
 
             });
     
@@ -294,27 +294,6 @@ impl App for WordUnscramblerApp {
                         FontFamily::Monospace),
                     Color32::WHITE);
             }
-        });//End Side Panel
-
-        SidePanel::left("Friends").show(ctx, |ui|{ //Friends List
-            ui.heading("Friends List");
-            ui.separator();
-            ui.label("Users:");
-
-            // Create new instance of DbAPI
-            let mut current_users: String = "Current Players: f".to_owned();
-            let user_list = self.user_data_base.users.lock().unwrap().clone();
-            for user in user_list {
-                    let entry: &str = &format!(
-                        "User ID: {}  \n
-                        User Name: {} \n
-                        Password: {} \n
-                        High Score: {} \n", &user.UserID, &user.Username, &user.Password, &user.HighScore);
-                current_users.push_str(entry)
-            }
-
-            ui.label(current_users);
-
         });//End Side Panel
 
         CentralPanel::default().show(ctx, |ui| { //Game Area
@@ -350,7 +329,6 @@ impl App for WordUnscramblerApp {
                             if self.game_state.scrambled_word.contains(&String::from(next_char)) {
                                 self.input_text.push(next_char);
                             }
-                            //eprint!("{}\n", self.input_text);
                             let re = Regex::new(&format!(r"{}", regex::escape(&next_char.to_string()))).unwrap();
                             self.game_state.scrambled_word = re.replace(&self.game_state.scrambled_word, "").to_string();},
 
@@ -363,8 +341,6 @@ impl App for WordUnscramblerApp {
                         Event::Key {key: egui::Key::Enter, pressed: true, ..  } => {
                             self.submit_input();
 
-                            //self.submit_input();
-                            println!("Scrambled Word: {}", self.game_state.scrambled_word);
                             self.input_text.clear()},
 
                         _ => ()};

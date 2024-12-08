@@ -69,7 +69,7 @@ impl WordApi {
             if let Some(original_word) = buffer.pop() {
                 if buffer.is_empty(){ self.word_length += 1 }; //Increment word length if last word in buffer
                 let scrambled_word = self.scramble_word(&original_word);
-                println!("Words Remaining: {}", buffer.len());
+                //println!("Words Remaining: {}", buffer.len());
                 return Some((scrambled_word, original_word));
             }
         } // Release the lock before potentially spawning async task

@@ -81,7 +81,7 @@ impl UpdateGameVariables for GameState{
             self.restore_scrambled = scrambled_word.clone();
             self.scrambled_word = scrambled_word;
             self.original_word = original_word;
-            println!("{}, {}", self.scrambled_word, self.original_word);
+            //println!("{}, {}", self.scrambled_word, self.original_word);
             self.api.requested = false;
         }else{
             self.api.requested = true;
