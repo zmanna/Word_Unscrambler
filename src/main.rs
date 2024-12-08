@@ -249,8 +249,7 @@ impl App for WordUnscramblerApp {
             let correct = self.guess_history.iter().filter(|&n| n.1 == true).count() as f32;
             let ratio = if guesses == 0.0 {0.0} else {correct / guesses};
             if !self.game_over_logged {
-                print!("Score: {}", self.game_state.score);
-                print!("Ratio: {:.2}", ratio);
+                print!("Word_Unscrambler {} {:.2}", self.game_state.score, ratio);
                 self.game_over_logged = true;
             }
 
