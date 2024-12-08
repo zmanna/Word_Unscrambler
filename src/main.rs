@@ -249,7 +249,7 @@ impl App for WordUnscramblerApp {
             let correct = self.guess_history.iter().filter(|&n| n.1 == true).count() as f32;
             let ratio = if guesses == 0.0 {0.0} else {correct / guesses};
             if !self.game_over_logged {
-                print!("Word_Unscrambler {} {:.2}", self.game_state.score, ratio);
+                println!("Word_Unscrambler {} {:.2}", self.game_state.score, ratio);
                 self.game_over_logged = true;
             }
 
@@ -339,7 +339,7 @@ impl App for WordUnscramblerApp {
 
                         Event::Key {key: egui::Key::Enter, pressed: true, ..  } => {
                             self.submit_input();
-
+                            println!("Input Received");
                             self.input_text.clear()},
 
                         _ => ()};
